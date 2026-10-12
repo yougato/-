@@ -27,6 +27,20 @@
   }
   .brand{ font-weight:700; letter-spacing:.5px; margin-right:4px; white-space:nowrap; }
   .brand span{ color:var(--accent); }
+  .readonly-badge{
+    display:none; align-items:center; gap:5px;
+    background:rgba(255,183,77,.15); border:1px solid rgba(255,183,77,.45);
+    color:#ffce7a; padding:3px 10px; border-radius:6px;
+    font-size:12px; font-weight:600; white-space:nowrap;
+  }
+  .readonly-badge.show{ display:inline-flex; }
+  .readonly-badge button{
+    background:transparent; border:none; color:#ffce7a;
+    font-size:11px; cursor:pointer; text-decoration:underline;
+    padding:0 2px; font-family:inherit;
+  }
+  .readonly-badge button:hover{ color:#fff; }
+
   .tbtn{
     background:var(--panel2); border:1px solid var(--border); color:var(--text);
     padding:6px 12px; border-radius:8px; cursor:pointer; font-size:13px;
@@ -37,7 +51,6 @@
   .tbtn.hl{ border-color:#3a5f9e; color:#9dc2ff; background:#1d2a42; }
   .tbtn.hl:hover{ border-color:var(--accent); background:#22314d; }
   .tbtn.free{ border-color:#4a7a3a; color:#b6e6a0; background:#1e2c19; }
-  .tbtn.free:hover{ border-color:#7ddc9a; background:#243521; }
   .tbtn.success{ border-color:#3fb96b; color:#a6efb8; background:rgba(63,185,107,.12); }
   .tbtn.success:hover{ border-color:#7ddc9a; background:rgba(63,185,107,.22); }
   .tbtn.imp{ border-color:#8a6a2a; color:#ffce7a; background:rgba(224,166,58,.1); }
@@ -78,6 +91,28 @@
   .save-status.ok{ color:var(--ok); background:rgba(60,180,110,.12); }
   .save-status.dirty{ color:var(--gold); background:rgba(255,183,77,.12); }
   .save-status.warn{ color:var(--muted); background:#1c2330; }
+
+  /* ---------------- 只读模式 ---------------- */
+  body.readonly-mode .node-title,
+  body.readonly-mode .node .base-input,
+  body.readonly-mode .node .note-input,
+  body.readonly-mode .node .r-input,
+  body.readonly-mode .node .rule-type,
+  body.readonly-mode .node .color-dot,
+  body.readonly-mode .node .icon-btn:not(.chev),
+  body.readonly-mode .node .add-rule,
+  body.readonly-mode .node .add-img,
+  body.readonly-mode .node .thumb-del,
+  body.readonly-mode .node .mini input,
+  body.readonly-mode .port{
+    pointer-events: none !important;
+    opacity: .55;
+  }
+  body.readonly-mode .node .port{
+    opacity: .3;
+  }
+  body.readonly-mode .node.dragging .node-head{ cursor: default !important; }
+  body.readonly-mode .node .node-head{ cursor: default !important; }
 
   /* ---------------- 画布 ---------------- */
   .stage{ flex:1; overflow:auto; position:relative; }
@@ -276,6 +311,10 @@
   .selection-bar .sel-count{ color:#9dc2ff; font-size:12.5px; padding-right:6px; }
   .selection-bar .sel-count b{ color:#fff; font-size:14px; }
   .tbtn.xs{ padding:4px 10px; font-size:12px; border-radius:7px; }
+  body.readonly-mode #selDelete,
+  body.readonly-mode #selColor,
+  body.readonly-mode #selCollapse,
+  body.readonly-mode #selExpand{ display:none; }
 
   /* ---------------- 缩放控件 ---------------- */
   .zoom-controls{
@@ -332,7 +371,6 @@
   }
   .mini-menu button:hover{ background:#2a3341; }
   .mini-menu button.primary{ background:rgba(76,141,255,.12); }
-  .mini-menu button.primary:hover{ background:rgba(76,141,255,.22); }
   .mini-menu button b{ font-weight:600; display:flex; align-items:center; gap:6px; }
   .mini-menu button small{ color:var(--muted); font-size:11px; font-weight:400; }
   .mini-menu .tag{
@@ -435,30 +473,104 @@
     display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap;
   }
 
-  .export-table{ font-size:12.5px; }
-  .et-row{
-    display:grid; grid-template-columns:1fr 158px 54px 78px; gap:10px;
-    padding:7px 3px; border-bottom:1px dashed #222a36; align-items:baseline;
+  /* 分享弹窗表单 */
+  .share-field{
+    display:flex; flex-direction:column; gap:6px;
+    margin-bottom:14px;
   }
-  .et-row.head{
-    font-weight:600; color:var(--muted); border-bottom:1px solid var(--border);
-    position:sticky; top:0; background:var(--panel); z-index:1;
-    padding-top:10px; padding-bottom:8px;
+  .share-field > label{
+    font-size:12px; color:var(--muted); font-weight:600;
   }
-  .et-id{ font-family:ui-monospace,monospace; color:var(--gold); word-break:break-all; line-height:1.4; }
-  .et-id.bad{ color:#ff8b8b; }
-  .et-id.unlinked{ color:#5d6878; font-style:italic; font-family:inherit; }
-  .et-name{ color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .et-lv{ text-align:center; color:var(--muted); }
-  .et-st{ font-size:11.5px; text-align:center; }
-  .et-st.ok{ color:#7ddc9a; }
-  .et-st.bad{ color:#ff8b8b; }
-  .et-st.warn{ color:var(--muted); }
-  .export-tip{
-    padding:9px 12px; margin:0 0 10px;
-    background:rgba(76,141,255,.08); border:1px solid rgba(76,141,255,.25);
-    border-radius:8px; font-size:12px; color:#9dc2ff; line-height:1.6;
+  .share-field input[type="text"],
+  .share-field input[type="password"],
+  .share-field textarea,
+  .share-field select{
+    width:100%; background:#0f141c; color:var(--text);
+    border:1px solid var(--border); border-radius:8px;
+    padding:8px 11px; font-size:13px; font-family:inherit;
+    outline:none;
   }
+  .share-field textarea{ min-height:56px; resize:vertical; line-height:1.5; }
+  .share-field input:focus, .share-field textarea:focus, .share-field select:focus{
+    border-color:var(--accent);
+  }
+  .share-row{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .share-row .share-field{ flex:1; min-width:150px; margin-bottom:0; }
+  .share-checkbox{
+    display:flex; align-items:center; gap:8px; font-size:13px;
+    cursor:pointer; user-select:none; padding:4px 0;
+  }
+  .share-checkbox input[type=checkbox]{
+    accent-color: var(--accent); width:16px; height:16px; margin:0;
+  }
+  .share-hint{
+    padding:10px 12px; border-radius:8px;
+    font-size:12px; line-height:1.7;
+    margin-bottom:12px;
+  }
+  .share-hint.info{
+    background:rgba(76,141,255,.08);
+    border:1px solid rgba(76,141,255,.25);
+    color:#9dc2ff;
+  }
+  .share-hint.warn{
+    background:rgba(255,183,77,.08);
+    border:1px solid rgba(255,183,77,.3);
+    color:#ffce7a;
+  }
+  .share-hint.ok{
+    background:rgba(63,185,107,.08);
+    border:1px solid rgba(63,185,107,.3);
+    color:#a6efb8;
+  }
+  .share-hint code{
+    background:#1c2330; padding:1px 6px; border-radius:4px;
+    color:var(--gold); font-family:ui-monospace,monospace;
+    font-size:11.5px;
+  }
+  .share-url-box{
+    display:flex; gap:8px;
+    background:#0f141c; border:1px solid var(--border);
+    border-radius:8px; padding:8px;
+  }
+  .share-url-box textarea{
+    flex:1; min-height:80px;
+    background:transparent; border:none; outline:none;
+    color:var(--gold); font-size:11.5px;
+    font-family:ui-monospace,monospace;
+    resize:vertical; line-height:1.5;
+    word-break:break-all;
+  }
+
+  /* 密码输入 */
+  .pw-input-wrap{
+    position:relative; display:flex; align-items:center;
+  }
+  .pw-input-wrap input{
+    width:100%; padding-right:42px !important;
+  }
+  .pw-toggle{
+    position:absolute; right:6px;
+    background:transparent; border:none; color:var(--muted);
+    width:30px; height:30px; border-radius:6px; cursor:pointer;
+    display:grid; place-items:center; font-size:14px; font-family:inherit;
+  }
+  .pw-toggle:hover{ color:var(--text); background:#1c2330; }
+
+  /* 分享信息展示 */
+  .share-meta-card{
+    background:#0f141c; border:1px solid var(--border);
+    border-radius:10px; padding:12px 14px; margin-bottom:14px;
+    display:flex; flex-direction:column; gap:7px;
+    font-size:12.5px;
+  }
+  .share-meta-row{
+    display:flex; align-items:baseline; gap:10px;
+  }
+  .share-meta-row .k{ color:var(--muted); min-width:64px; }
+  .share-meta-row .v{ color:var(--text); flex:1; word-break:break-all; }
+  .share-meta-row .v.hl{ color:var(--gold); font-weight:600; }
+  .share-meta-row .v.danger{ color:#ff8b8b; }
 
   /* ---------------- 数据看板 ---------------- */
   .dashboard-mask{
@@ -530,53 +642,34 @@
   .dstat.err .dv{ color:#ff8b8b; }
   .dstat.acc .dv{ color:var(--accent); }
 
-  .dashboard-body{
-    flex:1; overflow:auto;
-    padding: 0;
-  }
+  .dashboard-body{ flex:1; overflow:auto; }
   .dashboard-body::-webkit-scrollbar{ width:12px; height:12px; }
   .dashboard-body::-webkit-scrollbar-thumb{ background:#2a3341; border-radius:6px; }
 
-  .dash-table{
-    width:100%; border-collapse:collapse;
-    font-size:13px;
-  }
+  .dash-table{ width:100%; border-collapse:collapse; font-size:13px; }
   .dash-table thead th{
     position:sticky; top:0; z-index:2;
-    background:#1b2230;
-    color:var(--muted); font-weight:600; font-size:12px;
+    background:#1b2230; color:var(--muted); font-weight:600; font-size:12px;
     text-align:left; padding:10px 12px;
     border-bottom:1px solid var(--border);
-    white-space:nowrap;
-    user-select:none;
+    white-space:nowrap; user-select:none;
   }
-  .dash-table tbody tr{
-    cursor:pointer;
-    transition:.1s;
-    border-bottom:1px solid #1a212e;
-  }
+  .dash-table tbody tr{ cursor:pointer; transition:.1s; border-bottom:1px solid #1a212e; }
   .dash-table tbody tr:hover{ background:rgba(76,141,255,.08); }
-  .dash-table tbody td{
-    padding:9px 12px;
-    vertical-align:middle;
-    color:var(--text);
-  }
+  .dash-table tbody td{ padding:9px 12px; vertical-align:middle; color:var(--text); }
   .dash-table .col-lv{
     width:60px; text-align:center;
-    font-family:ui-monospace,monospace;
-    color:var(--muted); font-size:12px;
+    font-family:ui-monospace,monospace; color:var(--muted); font-size:12px;
   }
   .dash-table .col-lv-badge{
-    display:inline-block; min-width:24px;
-    padding:2px 8px; border-radius:5px;
+    display:inline-block; min-width:24px; padding:2px 8px; border-radius:5px;
     background:#1c2330; border:1px solid var(--border);
     color:#c9a6f0; font-size:11px;
   }
   .dash-table .col-name{ font-weight:600; }
   .dash-table .col-id{
-    font-family:ui-monospace,monospace;
-    color:var(--gold); font-size:12.5px;
-    word-break:break-all;
+    font-family:ui-monospace,monospace; color:var(--gold);
+    font-size:12.5px; word-break:break-all;
   }
   .dash-table .col-id.bad{ color:#ff8b8b; }
   .dash-table .col-id.unlinked{ color:#5d6878; font-style:italic; font-family:inherit; }
@@ -586,10 +679,7 @@
     max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
   }
   .dash-table .col-img{ text-align:center; color:var(--muted); font-size:12px; }
-  .dash-table .col-st{
-    text-align:center; font-size:11.5px;
-    white-space:nowrap;
-  }
+  .dash-table .col-st{ text-align:center; font-size:11.5px; white-space:nowrap; }
   .dash-table .col-st.ok{ color:#7ddc9a; }
   .dash-table .col-st.bad{ color:#ff8b8b; }
   .dash-table .col-st.warn{ color:var(--gold); }
@@ -598,60 +688,14 @@
     margin-right:8px; vertical-align:middle;
     border:1px solid rgba(255,255,255,.15);
   }
-  .dash-empty{
-    text-align:center; padding:60px 20px;
-    color:var(--muted); font-size:13px;
-  }
+  .dash-empty{ text-align:center; padding:60px 20px; color:var(--muted); font-size:13px; }
 
   .dashboard-foot{
-    padding:12px 20px;
-    border-top:1px solid var(--border);
+    padding:12px 20px; border-top:1px solid var(--border);
     display:flex; align-items:center; gap:8px; flex-wrap:wrap;
     background:#141920;
   }
   .dashboard-foot .spacer{ flex:1; }
-
-  /* ---------------- 局域网分享 ---------------- */
-  .share-url-box{
-    display:flex; gap:8px;
-    background:#0f141c; border:1px solid var(--border);
-    border-radius:8px; padding:8px;
-  }
-  .share-url-box textarea{
-    flex:1; min-height:80px;
-    background:transparent; border:none; outline:none;
-    color:var(--gold); font-size:11.5px;
-    font-family:ui-monospace,monospace;
-    resize:vertical; line-height:1.5;
-    word-break:break-all;
-  }
-  .share-url-box textarea::-webkit-scrollbar{ width:8px; }
-  .share-url-box textarea::-webkit-scrollbar-thumb{ background:#2a3341; border-radius:4px; }
-
-  .share-hint{
-    padding:10px 12px; border-radius:8px;
-    font-size:12px; line-height:1.7;
-    margin-bottom:12px;
-  }
-  .share-hint.info{
-    background:rgba(76,141,255,.08);
-    border:1px solid rgba(76,141,255,.25);
-    color:#9dc2ff;
-  }
-  .share-hint.warn{
-    background:rgba(255,183,77,.08);
-    border:1px solid rgba(255,183,77,.3);
-    color:#ffce7a;
-  }
-  .share-hint code{
-    background:#1c2330; padding:1px 6px; border-radius:4px;
-    color:var(--gold); font-family:ui-monospace,monospace;
-    font-size:11.5px;
-  }
-  .share-section-title{
-    font-size:12px; color:var(--muted);
-    margin:14px 0 6px; letter-spacing:.5px;
-  }
 
   .toast{
     position:fixed; left:50%; bottom:32px; transform:translateX(-50%) translateY(20px);
@@ -666,6 +710,10 @@
 
 <div class="toolbar">
   <div class="brand">订货号<span>·节点生成器</span></div>
+  <div class="readonly-badge" id="readonlyBadge">
+    🔒 只读模式
+    <button id="btnExitReadonly">退出</button>
+  </div>
   <button class="tbtn" id="btnRoot">＋ 起始节点</button>
 
   <div class="btn-split">
@@ -673,18 +721,18 @@
     <button class="tbtn hl caret" id="btnLayoutMenu" title="选择其他排版方式">▾</button>
   </div>
 
-  <button class="tbtn success" id="btnAutoToggle" title="折叠或展开节点后是否自动重新排版">📐 自动排版 · 开</button>
-  <button class="tbtn" id="btnMoveMode" title="拖拽模式：防重叠 / 自由移动">🔒 防重叠</button>
-  <button class="tbtn" id="btnLevelColor" title="按层级自动配色，同级同色">🎨 层级配色</button>
-  <button class="tbtn dash" id="btnDashboard" title="以表格形式查看全部数据">📊 数据看板</button>
+  <button class="tbtn success" id="btnAutoToggle">📐 自动排版 · 开</button>
+  <button class="tbtn" id="btnMoveMode">🔒 防重叠</button>
+  <button class="tbtn" id="btnLevelColor">🎨 层级配色</button>
+  <button class="tbtn dash" id="btnDashboard">📊 数据看板</button>
   <button class="tbtn success" id="btnExport">📈 导出 Excel</button>
   <button class="tbtn imp" id="btnImport">📥 CSV 导入</button>
 
   <div class="search-box">
     <input type="text" id="searchInput" placeholder="搜索 名称/订货号/备注" />
     <span class="cnt" id="searchCount"></span>
-    <button class="snav" id="searchPrev" title="上一个 (Shift+Enter)">▲</button>
-    <button class="snav" id="searchNext" title="下一个 (Enter)">▼</button>
+    <button class="snav" id="searchPrev">▲</button>
+    <button class="snav" id="searchNext">▼</button>
   </div>
 
   <div class="spacer"></div>
@@ -707,11 +755,11 @@
 <!-- 选择操作条 -->
 <div class="selection-bar" id="selectionBar">
   <span class="sel-count">已选 <b id="selCount">0</b> 项</span>
-  <button class="tbtn xs" id="selColor" title="为选中节点批量设置颜色">🎨 改色</button>
-  <button class="tbtn xs" id="selCollapse" title="折叠选中节点（会触发自动排版）">▸ 折叠</button>
-  <button class="tbtn xs" id="selExpand" title="展开选中节点（会触发自动排版）">▾ 展开</button>
-  <button class="tbtn xs danger" id="selDelete" title="删除选中节点及其子节点">🗑 删除</button>
-  <button class="tbtn xs" id="selClear" title="取消选择 (Esc)">✕</button>
+  <button class="tbtn xs" id="selColor">🎨 改色</button>
+  <button class="tbtn xs" id="selCollapse">▸ 折叠</button>
+  <button class="tbtn xs" id="selExpand">▾ 展开</button>
+  <button class="tbtn xs danger" id="selDelete">🗑 删除</button>
+  <button class="tbtn xs" id="selClear">✕</button>
 </div>
 
 <!-- 缩放控件 -->
@@ -760,16 +808,31 @@
   </div>
 </div>
 
-<!-- 局域网分享弹窗 -->
+<!-- 分享弹窗 -->
 <div class="modal-mask" id="shareMask">
   <div class="modal">
     <div class="modal-head">
-      <span>🔗 局域网分享数据看板</span>
+      <span>🔗 安全分享数据看板</span>
       <button class="icon-btn" id="shareClose">✕</button>
     </div>
     <div class="modal-body" id="shareBody"></div>
     <div class="modal-foot">
       <button class="tbtn" id="shareOk">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 密码输入弹窗 -->
+<div class="modal-mask" id="pwMask">
+  <div class="modal" style="width:min(440px,92vw)">
+    <div class="modal-head">
+      <span>🔐 需要密码解密</span>
+      <button class="icon-btn" id="pwClose">✕</button>
+    </div>
+    <div class="modal-body" id="pwBody"></div>
+    <div class="modal-foot">
+      <button class="tbtn success" id="pwSubmit">解锁</button>
+      <button class="tbtn" id="pwCancel">取消</button>
     </div>
   </div>
 </div>
@@ -783,7 +846,7 @@
         <input type="text" id="dashSearchInput" placeholder="搜索 名称 / 订货号 / 备注 / 父节点…" />
         <span class="cnt" id="dashCount"></span>
       </div>
-      <button class="dashboard-close" id="dashClose" title="关闭 (Esc)">✕</button>
+      <button class="dashboard-close" id="dashClose">✕</button>
     </div>
     <div class="dashboard-stats" id="dashStats"></div>
     <div class="dashboard-body">
@@ -804,11 +867,11 @@
       <div class="dash-empty" id="dashEmpty" style="display:none"></div>
     </div>
     <div class="dashboard-foot">
-      <button class="tbtn" id="dashLevelColor" title="按层级给画布节点配色">🎨 应用层级配色</button>
-      <button class="tbtn" id="dashFit" title="适应全部节点">🎯 定位全部</button>
+      <button class="tbtn" id="dashLevelColor">🎨 应用层级配色</button>
+      <button class="tbtn" id="dashFit">🎯 定位全部</button>
       <span class="spacer"></span>
       <button class="tbtn success" id="dashExportXlsx">📈 导出 Excel</button>
-      <button class="tbtn dash" id="dashShare">🔗 局域网分享</button>
+      <button class="tbtn dash" id="dashShare">🔗 安全分享</button>
     </div>
   </div>
 </div>
@@ -818,17 +881,17 @@
   <div class="iv-bar">
     <span class="iv-title" id="ivTitle"></span>
     <span class="iv-spacer"></span>
-    <button class="iv-btn" id="ivPrev" title="上一张 (←)">‹</button>
+    <button class="iv-btn" id="ivPrev">‹</button>
     <span class="iv-idx" id="ivIdx">1/1</span>
-    <button class="iv-btn" id="ivNext" title="下一张 (→)">›</button>
+    <button class="iv-btn" id="ivNext">›</button>
     <span style="width:14px"></span>
-    <button class="iv-btn" id="ivZoomOut" title="缩小 (-)">−</button>
+    <button class="iv-btn" id="ivZoomOut">−</button>
     <span class="iv-zoom" id="ivZoom">100%</span>
-    <button class="iv-btn" id="ivZoomIn" title="放大 (+)">＋</button>
-    <button class="iv-btn" id="ivFit" title="适应窗口 (0)">适应</button>
-    <button class="iv-btn" id="ivActual" title="原始大小">1:1</button>
+    <button class="iv-btn" id="ivZoomIn">＋</button>
+    <button class="iv-btn" id="ivFit">适应</button>
+    <button class="iv-btn" id="ivActual">1:1</button>
     <span style="width:8px"></span>
-    <button class="iv-btn close" id="ivClose" title="关闭 (Esc)">✕</button>
+    <button class="iv-btn close" id="ivClose">✕</button>
   </div>
   <div class="iv-stage" id="ivStage">
     <img id="ivImg" alt="" draggable="false">
@@ -876,24 +939,65 @@ function toast(msg) {
   t.textContent = msg;
   t.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), 2000);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
 }
 
 /* =========================================================================
- *  状态
+ *  全局状态
  * ========================================================================= */
 const state = { nodes: [], edges: [], freeMove: false };
 let visibleSet = new Set();
 const selectedIds = new Set();
-
-// ★ 折叠/展开后自动排版开关
 let autoLayoutOnToggle = true;
+let readOnlyMode = false;         // ★ 只读模式
 
 const getNode  = id => state.nodes.find(n => n.id === id);
 const parentOf = id => {
   const e = state.edges.find(e => e.to === id);
   return e ? getNode(e.from) : null;
 };
+
+/* =========================================================================
+ *  只读模式
+ * ========================================================================= */
+function applyReadOnlyUI() {
+  const badge = document.getElementById('readonlyBadge');
+  if (readOnlyMode) {
+    document.body.classList.add('readonly-mode');
+    badge.classList.add('show');
+    // 禁用顶栏修改类按钮
+    ['btnRoot','btnLayout','btnLayoutMenu','btnAutoToggle','btnMoveMode','btnLevelColor',
+     'btnImport','btnSaveFile','btnSaveNow','btnOpenFile','btnClear'].forEach(id => {
+      const b = document.getElementById(id);
+      if (b) b.disabled = true;
+    });
+    // 禁用画布拖拽和连线
+    document.getElementById('selectionBar').classList.remove('show');
+  } else {
+    document.body.classList.remove('readonly-mode');
+    badge.classList.remove('show');
+    ['btnRoot','btnLayout','btnLayoutMenu','btnAutoToggle','btnMoveMode','btnLevelColor',
+     'btnImport','btnSaveFile','btnSaveNow','btnOpenFile','btnClear'].forEach(id => {
+      const b = document.getElementById(id);
+      if (b) b.disabled = false;
+    });
+  }
+  render();
+}
+document.getElementById('btnExitReadonly').onclick = () => {
+  if (!confirm('退出只读模式后可以编辑数据，确认退出？')) return;
+  readOnlyMode = false;
+  applyReadOnlyUI();
+  toast('已退出只读模式');
+};
+
+function guardReadOnly() {
+  if (readOnlyMode) {
+    toast('只读模式，无法修改数据');
+    return true;
+  }
+  return false;
+}
 
 /* =========================================================================
  *  层级配色
@@ -906,6 +1010,7 @@ function levelColorOf(depth) {
   return LEVEL_COLORS[((depth % LEVEL_COLORS.length) + LEVEL_COLORS.length) % LEVEL_COLORS.length];
 }
 function applyLevelColorsToAll(silent) {
+  if (guardReadOnly()) return;
   const depthMap = computeNodeDepth();
   state.nodes.forEach(n => {
     const d = depthMap.get(n.id) ?? 0;
@@ -925,14 +1030,15 @@ function updateAutoToggleBtn() {
   if (autoLayoutOnToggle) {
     btnAutoToggle.textContent = '📐 自动排版 · 开';
     btnAutoToggle.classList.add('success');
-    btnAutoToggle.title = '已开启：折叠或展开节点后自动重新排版（点击关闭）';
+    btnAutoToggle.title = '折叠或展开节点后自动重新排版（点击关闭）';
   } else {
     btnAutoToggle.textContent = '📐 自动排版 · 关';
     btnAutoToggle.classList.remove('success');
-    btnAutoToggle.title = '已关闭：折叠或展开后保持节点位置（点击开启）';
+    btnAutoToggle.title = '折叠或展开后保持节点位置（点击开启）';
   }
 }
 btnAutoToggle.onclick = () => {
+  if (guardReadOnly()) return;
   autoLayoutOnToggle = !autoLayoutOnToggle;
   updateAutoToggleBtn();
   toast(autoLayoutOnToggle ? '折叠/展开后将自动重新排版' : '已关闭自动排版');
@@ -989,7 +1095,6 @@ function setCanvasSize(w, h) {
   canvas.dataset.h = h;
   updateZoomWrap();
 }
-
 stage.addEventListener('wheel', e => {
   if (!e.ctrlKey && !e.metaKey) return;
   e.preventDefault();
@@ -1024,8 +1129,7 @@ document.getElementById('zoomFit').onclick = () => {
  * ========================================================================= */
 function parseOptions(text) {
   return String(text || '')
-    .split(/[,\n;，]/)
-    .map(s => s.trim()).filter(Boolean)
+    .split(/[,\n;，]/).map(s => s.trim()).filter(Boolean)
     .map(s => {
       const m = s.split(/[:：=]/);
       if (m.length >= 2) return { code: m[0].trim(), label: m.slice(1).join(':').trim() };
@@ -1063,7 +1167,7 @@ function ruleSegment(node, rule) {
       const w = Math.max(1, Math.min(8, Number(rule.digits) || 1));
       return String(v).padStart(w, '0');
     }
-    case 'date':   return formatDate(rule.format || 'YYYYMMDD');
+    case 'date': return formatDate(rule.format || 'YYYYMMDD');
   }
   return '';
 }
@@ -1096,9 +1200,7 @@ function checkDuplicates() {
       if (seen.has(seg)) {
         conflict.add(node.id);
         conflict.add(seen.get(seg).id);
-      } else {
-        seen.set(seg, node);
-      }
+      } else seen.set(seg, node);
     }
   }
   return conflict;
@@ -1116,10 +1218,6 @@ function computeNodeDepth() {
   state.nodes.forEach(n => { if (!d.has(n.id)) d.set(n.id, 0); });
   return d;
 }
-
-/* =========================================================================
- *  可见性（折叠）
- * ========================================================================= */
 function computeVisible() {
   const visible = new Set();
   const guard = new Set();
@@ -1214,6 +1312,7 @@ function drawEdges() {
     hit.setAttribute('class', 'edge-hit');
     hit.addEventListener('click', ev => {
       ev.stopPropagation();
+      if (guardReadOnly()) return;
       state.edges = state.edges.filter(x => x.id !== e.id);
       drawEdges(); refreshIds(); markDirty();
       toast('已断开连接');
@@ -1280,6 +1379,7 @@ function positionColorPop(pop, anchorBtn) {
   pop.style.left = left + 'px'; pop.style.top = top + 'px';
 }
 function openColorPop(node, anchorBtn) {
+  if (guardReadOnly()) return;
   closeColorPop();
   const pop = el('div', 'color-pop');
   PRESET_COLORS.forEach(c => {
@@ -1309,43 +1409,6 @@ function openColorPop(node, anchorBtn) {
   };
   setTimeout(() => document.addEventListener('pointerdown', colorPopOutside, true), 0);
 }
-function openColorPopMulti(nodesArr, anchorBtn) {
-  closeColorPop();
-  const pop = el('div', 'color-pop');
-  PRESET_COLORS.forEach(c => {
-    const s = el('button', 'swatch');
-    s.style.background = c;
-    s.onclick = ev => {
-      ev.stopPropagation();
-      nodesArr.forEach(n => n.color = c);
-      closeColorPop(); render(); markDirty();
-    };
-    pop.appendChild(s);
-  });
-  const custom = el('label', 'swatch custom');
-  custom.title = '自定义颜色';
-  custom.style.background = 'conic-gradient(#f55,#fd5,#5f5,#5ff,#55f,#f5f,#f55)';
-  const ci = el('input'); ci.type = 'color'; ci.value = '#4c8dff';
-  ci.oninput = () => { nodesArr.forEach(n => n.color = ci.value); render(); };
-  ci.onchange = () => { closeColorPop(); markDirty(); };
-  custom.appendChild(ci); pop.appendChild(custom);
-
-  const reset = el('button', 'swatch', '∅'); reset.title = '恢复默认颜色';
-  reset.onclick = ev => {
-    ev.stopPropagation();
-    nodesArr.forEach(n => n.color = null);
-    closeColorPop(); render(); markDirty();
-  };
-  pop.appendChild(reset);
-
-  document.body.appendChild(pop);
-  colorPopEl = pop;
-  positionColorPop(pop, anchorBtn);
-  colorPopOutside = ev => {
-    if (colorPopEl && !colorPopEl.contains(ev.target) && !anchorBtn.contains(ev.target)) closeColorPop();
-  };
-  setTimeout(() => document.addEventListener('pointerdown', colorPopOutside, true), 0);
-}
 
 /* =========================================================================
  *  规则编辑器
@@ -1361,6 +1424,7 @@ function buildRuleEl(node, rule) {
   const del = el('button', 'icon-btn del', '✕');
   del.title = '删除该字段';
   del.onclick = () => {
+    if (guardReadOnly()) return;
     const i = node.rules.indexOf(rule);
     if (i > -1) node.rules.splice(i, 1);
     render(); markDirty();
@@ -1424,6 +1488,7 @@ function buildRuleEl(node, rule) {
     }
   }
   sel.onchange = () => {
+    if (guardReadOnly()) return;
     rule.type = sel.value;
     if (rule.type === 'fixed'  && rule.text === undefined)   rule.text = '-A';
     if (rule.type === 'choice' && !rule.options) { rule.options = '01:A型,02:B型'; rule.selected = '01'; }
@@ -1436,22 +1501,16 @@ function buildRuleEl(node, rule) {
 }
 
 /* =========================================================================
- *  折叠/展开（含自动排版）
+ *  折叠/展开
  * ========================================================================= */
 function toggleCollapseNode(node) {
   node.collapsed = !node.collapsed;
   render();
-  markDirty();
+  if (!readOnlyMode) markDirty();
 
-  // ★ 折叠/展开后自动排版（若开启）
-  if (autoLayoutOnToggle && state.nodes.length > 1) {
-    // 使用 requestAnimationFrame 让浏览器先完成当前渲染
+  if (autoLayoutOnToggle && !readOnlyMode && state.nodes.length > 1) {
     requestAnimationFrame(() => {
-      autoLayout('vertical', {
-        forceFreeMove: false,   // 不改变用户当前的拖拽模式
-        toastMsg: false,        // 不弹提示，避免打扰
-        scrollToStart: false    // 不跳回左上角，保持用户当前视野
-      });
+      autoLayout('vertical', { forceFreeMove: false, toastMsg: false, scrollToStart: false });
     });
   }
 }
@@ -1479,15 +1538,12 @@ function buildNodeEl(node) {
   if (node.color) head.style.background = `linear-gradient(180deg, ${hexA(node.color,.40)}, ${hexA(node.color,.12)})`;
 
   const chev = el('button', 'icon-btn chev', node.collapsed ? '▸' : '▾');
-  chev.title = '折叠 / 展开（连同子节点）';
-  chev.onclick = ev => {
-    ev.stopPropagation();
-    toggleCollapseNode(node);  // ★ 使用封装函数
-  };
+  chev.title = '折叠 / 展开';
+  chev.onclick = ev => { ev.stopPropagation(); toggleCollapseNode(node); };
 
   const title = el('input', 'node-title');
   title.value = node.title;
-  title.oninput = () => { node.title = title.value; markDirty(); };
+  title.oninput = () => { if (readOnlyMode) { title.value = node.title; return; } node.title = title.value; markDirty(); };
 
   const colorBtn = el('button', 'color-dot');
   colorBtn.title = '更改节点颜色';
@@ -1496,11 +1552,11 @@ function buildNodeEl(node) {
 
   const addBtn = el('button', 'icon-btn', '＋');
   addBtn.title = '添加子节点';
-  addBtn.onclick = ev => { ev.stopPropagation(); addChild(node); };
+  addBtn.onclick = ev => { ev.stopPropagation(); if (guardReadOnly()) return; addChild(node); };
 
   const delBtn = el('button', 'icon-btn del', '✕');
   delBtn.title = '删除节点（含其所有子节点）';
-  delBtn.onclick = ev => { ev.stopPropagation(); removeNode(node.id); };
+  delBtn.onclick = ev => { ev.stopPropagation(); if (guardReadOnly()) return; removeNode(node.id); };
 
   head.append(chev, title, colorBtn, addBtn, delBtn);
   wrap.appendChild(head);
@@ -1512,7 +1568,7 @@ function buildNodeEl(node) {
     field.appendChild(el('span', null, '起始文本 ID'));
     const base = el('input', 'base-input');
     base.value = node.baseId || ''; base.placeholder = '如 AB';
-    base.oninput = () => { node.baseId = base.value; refreshIds(); markDirty(); };
+    base.oninput = () => { if (readOnlyMode) { base.value = node.baseId || ''; return; } node.baseId = base.value; refreshIds(); markDirty(); };
     field.appendChild(base);
     body.appendChild(field);
   }
@@ -1542,14 +1598,18 @@ function buildNodeEl(node) {
     node.rules.forEach(r => rulesWrap.appendChild(buildRuleEl(node, r)));
     body.appendChild(rulesWrap);
     const addRule = el('button', 'add-rule', '＋ 扩展字段');
-    addRule.onclick = ev => { ev.stopPropagation(); node.rules.push({ type: 'fixed', text: '-' }); render(); markDirty(); };
+    addRule.onclick = ev => {
+      ev.stopPropagation();
+      if (guardReadOnly()) return;
+      node.rules.push({ type: 'fixed', text: '-' }); render(); markDirty();
+    };
     body.appendChild(addRule);
   }
 
   const note = el('textarea', 'note-input');
   note.placeholder = '备注（工艺 / 客户 / 说明…）';
   note.value = node.note || '';
-  note.oninput = () => { node.note = note.value; markDirty(); };
+  note.oninput = () => { if (readOnlyMode) { note.value = node.note || ''; return; } node.note = note.value; markDirty(); };
   note.onpointerdown = ev => ev.stopPropagation();
   body.appendChild(note);
 
@@ -1560,7 +1620,11 @@ function buildNodeEl(node) {
       const t = el('div', 'thumb');
       const img = el('img'); img.src = src;
       const d = el('button', 'thumb-del', '✕'); d.title = '删除截图';
-      d.onclick = ev => { ev.stopPropagation(); node.images.splice(i, 1); rebuildGallery(); markDirty(); };
+      d.onclick = ev => {
+        ev.stopPropagation();
+        if (guardReadOnly()) return;
+        node.images.splice(i, 1); rebuildGallery(); markDirty();
+      };
       t.onclick = ev => { ev.stopPropagation(); openImageViewer([...node.images], i, node.title); };
       t.append(img, d);
       gallery.appendChild(t);
@@ -1570,6 +1634,7 @@ function buildNodeEl(node) {
     const fi = el('input');
     fi.type = 'file'; fi.accept = 'image/*'; fi.multiple = true; fi.style.display = 'none';
     fi.onchange = async () => {
+      if (guardReadOnly()) return;
       for (const f of fi.files) { try { node.images.push(await compressImage(f)); } catch (e) {} }
       fi.value = ''; rebuildGallery(); markDirty(); toast('已添加截图');
     };
@@ -1588,9 +1653,6 @@ function buildNodeEl(node) {
   return wrap;
 }
 
-/* =========================================================================
- *  整体渲染
- * ========================================================================= */
 function render() {
   visibleSet = computeVisible();
   canvas.querySelectorAll('.node').forEach(n => n.remove());
@@ -1623,7 +1685,10 @@ function setFreeMove(v, silent) {
   }
   if (!silent) toast(state.freeMove ? '已切换到自由移动模式' : '已切换到防重叠模式');
 }
-document.getElementById('btnMoveMode').onclick = () => setFreeMove(!state.freeMove);
+document.getElementById('btnMoveMode').onclick = () => {
+  if (guardReadOnly()) return;
+  setFreeMove(!state.freeMove);
+};
 
 /* =========================================================================
  *  批量选择
@@ -1673,6 +1738,7 @@ function updateSelectionBar() {
 
 document.getElementById('selClear').onclick = clearSelection;
 document.getElementById('selDelete').onclick = () => {
+  if (guardReadOnly()) return;
   const selected = getSelectedNodes();
   if (!selected.length) return;
   if (!confirm(`确定删除选中的 ${selected.length} 个节点及其所有子节点？`)) return;
@@ -1690,6 +1756,7 @@ document.getElementById('selDelete').onclick = () => {
   toast(`已删除 ${doomed.size} 个节点`);
 };
 document.getElementById('selColor').onclick = ev => {
+  if (guardReadOnly()) return;
   const selected = getSelectedNodes();
   if (!selected.length) return;
   openColorPopMulti(selected, ev.currentTarget);
@@ -1698,11 +1765,10 @@ document.getElementById('selCollapse').onclick = () => {
   const selected = getSelectedNodes();
   if (!selected.length) return;
   selected.forEach(n => n.collapsed = true);
-  render(); markDirty();
-  if (autoLayoutOnToggle && state.nodes.length > 1) {
-    requestAnimationFrame(() => {
-      autoLayout('vertical', { forceFreeMove: false, toastMsg: false, scrollToStart: false });
-    });
+  render();
+  if (!readOnlyMode) markDirty();
+  if (autoLayoutOnToggle && !readOnlyMode && state.nodes.length > 1) {
+    requestAnimationFrame(() => autoLayout('vertical', { forceFreeMove: false, toastMsg: false, scrollToStart: false }));
   }
   toast(`已折叠 ${selected.length} 个节点`);
 };
@@ -1710,11 +1776,10 @@ document.getElementById('selExpand').onclick = () => {
   const selected = getSelectedNodes();
   if (!selected.length) return;
   selected.forEach(n => n.collapsed = false);
-  render(); markDirty();
-  if (autoLayoutOnToggle && state.nodes.length > 1) {
-    requestAnimationFrame(() => {
-      autoLayout('vertical', { forceFreeMove: false, toastMsg: false, scrollToStart: false });
-    });
+  render();
+  if (!readOnlyMode) markDirty();
+  if (autoLayoutOnToggle && !readOnlyMode && state.nodes.length > 1) {
+    requestAnimationFrame(() => autoLayout('vertical', { forceFreeMove: false, toastMsg: false, scrollToStart: false }));
   }
   toast(`已展开 ${selected.length} 个节点`);
 };
@@ -1725,7 +1790,6 @@ document.getElementById('selExpand').onclick = () => {
 function startBoxSelect(e) {
   e.preventDefault();
   const start = toCanvas(e.clientX, e.clientY);
-
   const box = document.createElement('div');
   box.className = 'selection-box';
   box.style.left = start.x + 'px';
@@ -1751,16 +1815,13 @@ function startBoxSelect(e) {
     box.style.top  = y + 'px';
     box.style.width  = w + 'px';
     box.style.height = h + 'px';
-
     selectedIds.clear();
     baseSelected.forEach(id => selectedIds.add(id));
     for (const n of state.nodes) {
       if (!visibleSet.has(n.id)) continue;
       const rx = n.x, ry = n.y;
       const rw = n._w || NODE_W, rh = n._h || DEF_H;
-      if (rx + rw >= x && rx <= x + w && ry + rh >= y && ry <= y + h) {
-        selectedIds.add(n.id);
-      }
+      if (rx + rw >= x && rx <= x + w && ry + rh >= y && ry <= y + h) selectedIds.add(n.id);
     }
     applySelectionVisual();
     updateSelectionBar();
@@ -1795,7 +1856,6 @@ function showPathTooltip(node, e) {
   const finalId = computeId(node);
   const conflicts = checkDuplicates();
   const isBad = conflicts.has(node.id);
-
   let html = '<div class="pt-title">完整路径</div><div class="pt-chain">';
   chain.forEach((n, i) => {
     const isCurrent = i === chain.length - 1;
@@ -1803,9 +1863,7 @@ function showPathTooltip(node, e) {
     html += `<div class="pt-item${isCurrent ? ' current' : ''}">`;
     if (i > 0) html += `<span class="pt-arrow">↳</span>`;
     html += `<span>${escapeHtml(n.title || '未命名')}</span>`;
-    if (nid != null && nid !== '') {
-      html += `<span class="pt-num">${escapeHtml(nid)}</span>`;
-    }
+    if (nid != null && nid !== '') html += `<span class="pt-num">${escapeHtml(nid)}</span>`;
     html += `</div>`;
   });
   html += '</div>';
@@ -1815,7 +1873,6 @@ function showPathTooltip(node, e) {
   } else {
     html += `<div class="pt-id"><span class="lbl">订货号</span>未连接</div>`;
   }
-
   pathTooltipEl.innerHTML = html;
   pathTooltipEl.classList.add('show');
   movePathTooltip(e);
@@ -1824,21 +1881,18 @@ function movePathTooltip(e) {
   if (!pathTooltipEl.classList.contains('show')) return;
   const tt = pathTooltipEl;
   const w = tt.offsetWidth, h = tt.offsetHeight;
-  let x = e.clientX + 18;
-  let y = e.clientY + 16;
+  let x = e.clientX + 18, y = e.clientY + 16;
   if (x + w > window.innerWidth - 10) x = e.clientX - w - 14;
   if (y + h > window.innerHeight - 10) y = e.clientY - h - 14;
-  tt.style.left = x + 'px';
-  tt.style.top  = y + 'px';
+  tt.style.left = x + 'px'; tt.style.top = y + 'px';
 }
-function hidePathTooltip() {
-  pathTooltipEl.classList.remove('show');
-}
+function hidePathTooltip() { pathTooltipEl.classList.remove('show'); }
 
 /* =========================================================================
  *  增删改
  * ========================================================================= */
 function addChild(parent) {
+  if (guardReadOnly()) return;
   const pDepth = computeNodeDepth().get(parent.id) ?? 0;
   const newDepth = pDepth + 1;
   const node = {
@@ -1851,7 +1905,6 @@ function addChild(parent) {
   state.nodes.push(node);
   state.edges.push({ id: uid('e'), from: parent.id, to: node.id });
   render();
-
   if (!state.freeMove && collides(node, node.x, node.y)) {
     const spot = findFreeSpot(node, node.x, node.y);
     node.x = spot.x; node.y = spot.y;
@@ -1862,8 +1915,8 @@ function addChild(parent) {
   markDirty();
   setTimeout(() => scrollToNode(node.id), 60);
 }
-
 function removeNode(id) {
+  if (guardReadOnly()) return;
   const node = getNode(id);
   if (!node) return;
   const doomed = new Set([id]);
@@ -1881,13 +1934,12 @@ function removeNode(id) {
   doomed.forEach(d => selectedIds.delete(d));
   render(); markDirty(); updateSelectionBar();
 }
-
 function connect(fromId, toId) {
+  if (guardReadOnly()) return;
   if (fromId === toId) return;
   const toNode = getNode(toId);
   if (!toNode) return;
   if (toNode.kind === 'root') return toast('起始节点不能作为子节点');
-
   let cur = getNode(fromId);
   const guard = new Set();
   while (cur) {
@@ -1902,12 +1954,26 @@ function connect(fromId, toId) {
 }
 
 /* =========================================================================
- *  交互：拖拽 / 连线 / 框选
+ *  画布交互
  * ========================================================================= */
 canvas.addEventListener('pointerdown', e => {
   hidePathTooltip();
   const nodeEl = e.target.closest('.node');
   activeNodeId = nodeEl ? nodeEl.dataset.id : null;
+
+  // 只读模式：允许框选和折叠，禁止拖拽和连线
+  if (readOnlyMode) {
+    if (e.target.closest('.chev')) return;
+    if (e.target.closest('input, select, button, textarea, label')) return;
+    if (!nodeEl) { startBoxSelect(e); return; }
+    if (nodeEl && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      toggleSelectNode(nodeEl);
+      return;
+    }
+    if (nodeEl) { toggleSelectNode(nodeEl); return; }
+    return;
+  }
 
   const outPort = e.target.closest('.port.out');
   if (outPort) { startLink(e, outPort.closest('.node').dataset.id); return; }
@@ -1920,19 +1986,16 @@ canvas.addEventListener('pointerdown', e => {
     toggleSelectNode(nodeEl);
     return;
   }
-
   if (nodeEl) {
-    if (!selectedIds.has(nodeEl.dataset.id) && selectedIds.size > 0) {
-      clearSelection();
-    }
+    if (!selectedIds.has(nodeEl.dataset.id) && selectedIds.size > 0) clearSelection();
     startDrag(e, nodeEl);
     return;
   }
-
   startBoxSelect(e);
 });
 
 function startDrag(e, nodeEl) {
+  if (guardReadOnly()) return;
   e.preventDefault();
   const node = getNode(nodeEl.dataset.id);
   if (!node) return;
@@ -1940,7 +2003,6 @@ function startDrag(e, nodeEl) {
   const ox = node.x, oy = node.y;
   nodeEl.classList.add('dragging');
   let moved = false;
-
   const move = ev => {
     moved = true;
     const dx = (ev.clientX - sx) / zoom;
@@ -1971,15 +2033,14 @@ function startDrag(e, nodeEl) {
 }
 
 function startLink(e, fromId) {
+  if (guardReadOnly()) return;
   e.preventDefault(); e.stopPropagation();
   const start = portPos(fromId, 'out');
   if (!start) return;
-
   const temp = document.createElementNS(NS, 'path');
   temp.setAttribute('class', 'edge temp');
   svg.appendChild(temp);
   let hovered = null;
-
   const move = ev => {
     const p = toCanvas(ev.clientX, ev.clientY);
     temp.setAttribute('d', curve(start, p));
@@ -2003,6 +2064,7 @@ function startLink(e, fromId) {
 }
 
 function unlink(e, toId) {
+  if (guardReadOnly()) return;
   e.preventDefault(); e.stopPropagation();
   const before = state.edges.length;
   state.edges = state.edges.filter(x => x.to !== toId);
@@ -2017,22 +2079,18 @@ document.addEventListener('keydown', e => {
   if (modalMask.classList.contains('show')) return;
   if (importMask.classList.contains('show')) return;
   if (shareMask.classList.contains('show')) return;
+  if (pwMask.classList.contains('show')) return;
   if (dashboardOpen) {
     if (e.key === 'Escape') { e.preventDefault(); closeDashboard(); return; }
     return;
   }
-
   const tag = (document.activeElement?.tagName || '').toLowerCase();
   const editing = tag === 'input' || tag === 'textarea' || tag === 'select';
-
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a' && !editing) {
     e.preventDefault();
     selectAll();
   } else if (e.key === 'Escape' && !editing) {
-    if (selectedIds.size > 0) {
-      e.preventDefault();
-      clearSelection();
-    }
+    if (selectedIds.size > 0) { e.preventDefault(); clearSelection(); }
   }
 });
 
@@ -2042,16 +2100,12 @@ document.addEventListener('keydown', e => {
 const LAYOUT_PAD = 80;
 
 function kidsOfNode(n) {
-  return state.edges
-    .filter(e => e.from === n.id)
-    .map(e => getNode(e.to))
-    .filter(Boolean)
+  return state.edges.filter(e => e.from === n.id).map(e => getNode(e.to)).filter(Boolean)
     .sort((a, b) => (a.y - b.y) || (a.x - b.x));
 }
 function visibleKidsOf(n) { return n.collapsed ? [] : kidsOfNode(n); }
 function rootNodes() {
-  return state.nodes
-    .filter(n => n.kind === 'root' || !parentOf(n.id))
+  return state.nodes.filter(n => n.kind === 'root' || !parentOf(n.id))
     .sort((a, b) => (a.y - b.y) || (a.x - b.x));
 }
 function computeDepths() {
@@ -2074,11 +2128,8 @@ function computeDepths() {
 function fitCanvasSize() {
   const maxX = Math.max(0, ...state.nodes.map(n => n.x + (n._w || NODE_W))) + LAYOUT_PAD;
   const maxY = Math.max(0, ...state.nodes.map(n => n.y + (n._h || DEF_H))) + LAYOUT_PAD;
-  const w = Math.max(4600, Math.ceil(maxX));
-  const h = Math.max(3400, Math.ceil(maxY));
-  setCanvasSize(w, h);
+  setCanvasSize(Math.max(4600, Math.ceil(maxX)), Math.max(3400, Math.ceil(maxY)));
 }
-
 function layoutTree() {
   const H_GAP = 46, V_GAP = 74;
   const { depth } = computeDepths();
@@ -2091,7 +2142,6 @@ function layoutTree() {
   const levelY = [];
   let acc = LAYOUT_PAD;
   for (let d = 0; d <= maxDepth; d++) { levelY[d] = acc; acc += levelH[d] + V_GAP; }
-
   const wCache = new Map();
   function subtreeW(n) {
     if (wCache.has(n.id)) return wCache.get(n.id);
@@ -2118,10 +2168,8 @@ function layoutTree() {
   let cursor = LAYOUT_PAD;
   for (const r of rootNodes()) { place(r, cursor); cursor += subtreeW(r) + H_GAP * 2.4; }
 }
-
 function layoutVertical() {
-  const COL_GAP = 130;
-  const ROW_GAP = 42;
+  const COL_GAP = 130, ROW_GAP = 42;
   const { depth, order } = computeDepths();
   const maxDepth = Math.max(0, ...depth.values());
   const cols = Array.from({ length: maxDepth + 1 }, () => []);
@@ -2130,63 +2178,34 @@ function layoutVertical() {
     const x = LAYOUT_PAD + d * (NODE_W + COL_GAP);
     let y = LAYOUT_PAD;
     for (const n of cols[d]) {
-      n.x = Math.round(x);
-      n.y = Math.round(y);
+      n.x = Math.round(x); n.y = Math.round(y);
       y += (n._h || DEF_H) + ROW_GAP;
     }
   }
 }
-
-/**
- * 一键排版
- * @param {string} mode  'vertical'（默认）或 'tree'
- * @param {object} opts
- *   - forceFreeMove: 是否强制开启自由移动（手动触发时为 true）
- *   - toastMsg:      是否弹提示
- *   - scrollToStart: 是否滚动到左上角
- */
 function autoLayout(mode = 'vertical', opts = {}) {
-  const {
-    forceFreeMove = true,
-    toastMsg = true,
-    scrollToStart = true
-  } = opts;
-
-  if (!state.nodes.length) {
-    if (toastMsg) toast('没有节点可排版');
-    return;
-  }
-
+  const { forceFreeMove = true, toastMsg = true, scrollToStart = true } = opts;
+  if (guardReadOnly()) return;
+  if (!state.nodes.length) { if (toastMsg) toast('没有节点可排版'); return; }
   visibleSet = computeVisible();
   measureNodeHeights();
-  if (mode === 'tree') layoutTree();
-  else layoutVertical();
+  if (mode === 'tree') layoutTree(); else layoutVertical();
   fitCanvasSize();
   render();
   markDirty();
-
   if (forceFreeMove) setFreeMove(true, true);
-
-  if (scrollToStart) {
-    stage.scrollTo({ left: 0, top: 0, behavior: 'smooth' });
-  }
-
-  if (toastMsg) {
-    toast(mode === 'tree'
-      ? '已按「横向树形」排列 · 现在可随意拖动节点'
-      : '已按「往右竖向」排列 · 现在可随意拖动节点');
-  }
+  if (scrollToStart) stage.scrollTo({ left: 0, top: 0, behavior: 'smooth' });
+  if (toastMsg) toast(mode === 'tree' ? '已按「横向树形」排列' : '已按「往右竖向」排列');
 }
-
 let layoutMenuEl = null, layoutMenuOutside = null;
 function closeLayoutMenu() {
   if (layoutMenuEl) { layoutMenuEl.remove(); layoutMenuEl = null; }
   if (layoutMenuOutside) { document.removeEventListener('pointerdown', layoutMenuOutside, true); layoutMenuOutside = null; }
 }
 function openLayoutMenu(anchorBtn) {
+  if (guardReadOnly()) return;
   closeLayoutMenu();
   const m = el('div', 'mini-menu');
-
   const b1 = el('button', 'primary');
   const t1 = el('b');
   t1.append(document.createTextNode('往右竖向排列'));
@@ -2196,22 +2215,18 @@ function openLayoutMenu(anchorBtn) {
   b1.append(t1, s1);
   b1.onclick = ev => { ev.stopPropagation(); closeLayoutMenu(); autoLayout('vertical'); };
   m.appendChild(b1);
-
   const b2 = el('button');
   const t2 = el('b', null, '横向树形排版');
   const s2 = el('small', null, '父节点在左，子节点向右层层展开');
   b2.append(t2, s2);
   b2.onclick = ev => { ev.stopPropagation(); closeLayoutMenu(); autoLayout('tree'); };
   m.appendChild(b2);
-
   m.appendChild(el('div', 'sep'));
-
   const tip = el('button');
   tip.style.cursor = 'default'; tip.style.opacity = '.72';
-  tip.appendChild(el('small', null, '提示：折叠/展开节点后也会自动排版（可在顶栏切换）'));
+  tip.appendChild(el('small', null, '提示：折叠/展开节点后也会自动排版'));
   tip.onclick = ev => ev.stopPropagation();
   m.appendChild(tip);
-
   document.body.appendChild(m);
   layoutMenuEl = m;
   const r = anchorBtn.getBoundingClientRect();
@@ -2221,7 +2236,6 @@ function openLayoutMenu(anchorBtn) {
   let top = r.bottom + 6;
   if (top + mh > window.innerHeight - 10) top = r.top - mh - 6;
   m.style.left = left + 'px'; m.style.top = top + 'px';
-
   layoutMenuOutside = ev => {
     if (layoutMenuEl && !layoutMenuEl.contains(ev.target) && !anchorBtn.contains(ev.target)) closeLayoutMenu();
   };
@@ -2234,6 +2248,7 @@ document.getElementById('btnLayoutMenu').onclick = ev => { ev.stopPropagation();
  *  粘贴截图
  * ========================================================================= */
 document.addEventListener('paste', async e => {
+  if (readOnlyMode) return;
   if (ivState.open) return;
   if (!activeNodeId) return;
   const node = getNode(activeNodeId);
@@ -2375,7 +2390,7 @@ document.addEventListener('keydown', e => {
 });
 
 /* =========================================================================
- *  搜索（画布）
+ *  搜索
  * ========================================================================= */
 let searchQuery = '';
 let searchHits = [];
@@ -2388,7 +2403,6 @@ function doSearch(q) {
   searchHits = [];
   searchIdx = -1;
   if (!searchQuery) { applySearchHighlight(); updateSearchCount(); return; }
-
   let needRender = false;
   for (const n of state.nodes) {
     const id = computeId(n);
@@ -2469,7 +2483,6 @@ function zipStore(files) {
     const nameBytes = enc.encode(f.name);
     const data = typeof f.data === 'string' ? enc.encode(f.data) : f.data;
     const crc = crc32(data);
-
     const lh = new Uint8Array(30 + nameBytes.length);
     const dv = new DataView(lh.buffer);
     dv.setUint32(0, 0x04034B50, true);
@@ -2485,7 +2498,6 @@ function zipStore(files) {
     dv.setUint16(28, 0, true);
     lh.set(nameBytes, 30);
     parts.push(lh, data);
-
     const cd = new Uint8Array(46 + nameBytes.length);
     const dv2 = new DataView(cd.buffer);
     dv2.setUint32(0, 0x02014B50, true);
@@ -2507,7 +2519,6 @@ function zipStore(files) {
     dv2.setUint32(42, offset, true);
     cd.set(nameBytes, 46);
     central.push(cd);
-
     offset += lh.length + data.length;
   }
   const centralSize = central.reduce((s, c) => s + c.length, 0);
@@ -2533,17 +2544,11 @@ function xmlEsc(s) {
 function xmlClean(s) { return String(s).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, ''); }
 function colLetter(n) {
   let s = '';
-  while (n > 0) {
-    const m = (n - 1) % 26;
-    s = String.fromCharCode(65 + m) + s;
-    n = Math.floor((n - 1) / 26);
-  }
+  while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); }
   return s;
 }
 function buildSheetXml(rows, colWidths) {
-  const cols = colWidths.map((w, i) =>
-    `<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`
-  ).join('');
+  const cols = colWidths.map((w, i) => `<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join('');
   const rowsXml = rows.map((row, ri) => {
     const cells = row.map((val, ci) => {
       const ref = colLetter(ci + 1) + (ri + 1);
@@ -2648,7 +2653,6 @@ function collectExportData() {
     };
   }).sort((a, b) => (a.depth - b.depth) || (a.node.y - b.node.y) || (a.node.x - b.node.x));
 }
-
 function buildSheetRows() {
   const rows = collectExportData();
   return [
@@ -2695,7 +2699,6 @@ document.getElementById('btnExport').onclick = () => {
   if (!state.nodes.length) return toast('还没有任何节点');
   const rows = collectExportData();
   const leafCount = rows.filter(r => r.isLeaf).length;
-
   const headHtml = `
     <div class="et-row head">
       <span>订货号</span><span>产品名称</span>
@@ -2713,35 +2716,28 @@ document.getElementById('btnExport').onclick = () => {
       <span class="et-st ${stCls}">${escapeHtml(r.status)}</span>
     </div>`;
   }).join('');
-
   const previewHtml = `
     <div class="export-tip">
       共 <b>${rows.length}</b> 个节点，其中成品（叶子）<b>${leafCount}</b> 个。
       默认导出为 <b>Excel (.xlsx)</b>。
     </div>
     <div class="export-table">${headHtml}${bodyHtml}</div>`;
-
   const rawText = rows.map(r => `${r.id}\t${r.name}`).join('\n');
-
   openModal(`导出订货号（${rows.length} 个节点）`, previewHtml, rawText, {
     showCopy: true, showDownload: true,
     onXlsx: () => {
       try {
         const sheetRows = buildSheetRows();
-        const colWidths = [30, 24, 8, 24, 40, 8, 12, 10];
-        downloadBlob(buildXlsxBlob(sheetRows, colWidths), `订货号_${todayStamp()}.xlsx`);
+        downloadBlob(buildXlsxBlob(sheetRows, [30, 24, 8, 24, 40, 8, 12, 10]), `订货号_${todayStamp()}.xlsx`);
         toast('已生成 Excel 文件');
-      } catch (err) {
-        console.error(err); toast('生成 Excel 失败：' + (err.message || err));
-      }
+      } catch (err) { toast('生成 Excel 失败：' + (err.message || err)); }
     },
     onCsv: () => {
       const esc = v => {
         const s = String(v == null ? '' : v);
         return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
       };
-      const csvRows = buildSheetRows();
-      const csv = '\uFEFF' + csvRows.map(r => r.map(esc).join(',')).join('\r\n');
+      const csv = '\uFEFF' + buildSheetRows().map(r => r.map(esc).join(',')).join('\r\n');
       downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), `订货号_${todayStamp()}.csv`);
       toast('已生成 CSV 文件');
     }
@@ -2760,7 +2756,7 @@ function openDashboard() {
   dashboardMask.classList.add('show');
   dashSearchQuery = '';
   const inp = document.getElementById('dashSearchInput');
-  if (inp) { inp.value = ''; }
+  if (inp) inp.value = '';
   renderDashboardStats();
   renderDashboardTable();
   setTimeout(() => inp?.focus(), 80);
@@ -2771,9 +2767,7 @@ function closeDashboard() {
 }
 document.getElementById('btnDashboard').onclick = openDashboard;
 document.getElementById('dashClose').onclick = closeDashboard;
-dashboardMask.addEventListener('click', e => {
-  if (e.target === dashboardMask) closeDashboard();
-});
+dashboardMask.addEventListener('click', e => { if (e.target === dashboardMask) closeDashboard(); });
 
 const dashSearchInputEl = document.getElementById('dashSearchInput');
 dashSearchInputEl?.addEventListener('input', () => {
@@ -2795,7 +2789,6 @@ function renderDashboardStats() {
   const unlinked = rows.filter(r => r.status === '未连接').length;
   const maxDepth = rows.length ? Math.max(...rows.map(r => r.depth)) : 0;
   const imgTotal = rows.reduce((s, r) => s + r.imageCount, 0);
-
   el.innerHTML = `
     <div class="dstat"><span class="dv">${rows.length}</span><span class="dl">总节点</span></div>
     <div class="dstat acc"><span class="dv">${roots}</span><span class="dl">起始族</span></div>
@@ -2813,7 +2806,6 @@ function renderDashboardTable() {
   const emptyEl = document.getElementById('dashEmpty');
   const cntEl = document.getElementById('dashCount');
   if (!tbody) return;
-
   const allRows = collectExportData();
   let filtered = allRows;
   if (dashSearchQuery) {
@@ -2822,29 +2814,17 @@ function renderDashboardTable() {
       return hay.includes(dashSearchQuery);
     });
   }
-
-  if (cntEl) {
-    cntEl.textContent = dashSearchQuery
-      ? `${filtered.length} / ${allRows.length}`
-      : `${allRows.length}`;
-  }
-
+  if (cntEl) cntEl.textContent = dashSearchQuery ? `${filtered.length} / ${allRows.length}` : `${allRows.length}`;
   if (!filtered.length) {
     tbody.innerHTML = '';
     emptyEl.style.display = '';
-    emptyEl.textContent = allRows.length
-      ? `没有匹配「${dashSearchQuery}」的结果`
-      : '还没有任何节点，请先在画布上创建。';
+    emptyEl.textContent = allRows.length ? `没有匹配「${dashSearchQuery}」的结果` : '还没有任何节点。';
     return;
   }
   emptyEl.style.display = 'none';
-
   tbody.innerHTML = filtered.map(r => {
-    const idCls = r.status === '同级重复' ? ' bad'
-                : r.status === '未连接'   ? ' unlinked' : '';
-    const stCls = r.status === '正常'    ? 'ok'
-                : r.status === '同级重复' ? 'bad'
-                : r.status === '未连接'   ? 'warn' : 'warn';
+    const idCls = r.status === '同级重复' ? ' bad' : r.status === '未连接' ? ' unlinked' : '';
+    const stCls = r.status === '正常' ? 'ok' : r.status === '同级重复' ? 'bad' : 'warn';
     const lvColor = levelColorOf(r.depth);
     return `<tr data-node-id="${escapeHtml(r.node.id)}">
       <td class="col-lv"><span class="col-lv-badge">${r.depth}</span></td>
@@ -2856,7 +2836,6 @@ function renderDashboardTable() {
       <td class="col-st ${stCls}">${escapeHtml(r.status)}</td>
     </tr>`;
   }).join('');
-
   tbody.querySelectorAll('tr[data-node-id]').forEach(tr => {
     tr.onclick = () => {
       const id = tr.dataset.nodeId;
@@ -2864,7 +2843,7 @@ function renderDashboardTable() {
       setTimeout(() => {
         let cur = parentOf(id), g = 0;
         while (cur && g++ < 60) {
-          if (cur.collapsed) { cur.collapsed = false; }
+          if (cur.collapsed) cur.collapsed = false;
           cur = parentOf(cur.id);
         }
         render();
@@ -2885,22 +2864,24 @@ document.getElementById('dashFit').onclick = () => {
 };
 document.getElementById('dashExportXlsx').onclick = () => {
   try {
-    const sheetRows = buildSheetRows();
-    const colWidths = [30, 24, 8, 24, 40, 8, 12, 10];
-    downloadBlob(buildXlsxBlob(sheetRows, colWidths), `订货号_${todayStamp()}.xlsx`);
+    downloadBlob(buildXlsxBlob(buildSheetRows(), [30, 24, 8, 24, 40, 8, 12, 10]), `订货号_${todayStamp()}.xlsx`);
     toast('已导出 Excel');
-  } catch (err) {
-    toast('导出失败：' + (err.message || err));
-  }
+  } catch (err) { toast('导出失败：' + (err.message || err)); }
 };
 document.getElementById('dashShare').onclick = () => openShareDialog();
 
 /* =========================================================================
- *  局域网分享
+ *  安全分享：加密 / 压缩 / 只读 / 有效期
  * ========================================================================= */
 const shareMask = document.getElementById('shareMask');
 const shareBody = document.getElementById('shareBody');
+const pwMask = document.getElementById('pwMask');
+const pwBody = document.getElementById('pwBody');
 
+const hasSubtle = !!(window.crypto && window.crypto.subtle && window.crypto.subtle.importKey);
+const hasCompression = typeof CompressionStream !== 'undefined';
+
+/* --- Base64URL 工具 --- */
 function bytesToBase64Url(bytes) {
   let bin = '';
   const chunk = 0x8000;
@@ -2917,66 +2898,142 @@ function base64UrlToBytes(s) {
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
   return bytes;
 }
-async function compressData(str) {
-  const bytes = new TextEncoder().encode(str);
-  if (typeof CompressionStream === 'undefined') {
-    return 'raw_' + bytesToBase64Url(bytes);
+
+/* --- gzip 压缩 / 解压 --- */
+async function gzipCompress(bytes) {
+  if (!hasCompression) return null;
+  const cs = new CompressionStream('gzip');
+  const writer = cs.writable.getWriter();
+  writer.write(bytes);
+  writer.close();
+  const chunks = [];
+  const reader = cs.readable.getReader();
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
   }
-  try {
-    const cs = new CompressionStream('gzip');
-    const writer = cs.writable.getWriter();
-    writer.write(bytes);
-    writer.close();
-    const chunks = [];
-    const reader = cs.readable.getReader();
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value);
-    }
-    let total = 0;
-    for (const c of chunks) total += c.length;
-    const out = new Uint8Array(total);
-    let o = 0;
-    for (const c of chunks) { out.set(c, o); o += c.length; }
-    return 'gz_' + bytesToBase64Url(out);
-  } catch (e) {
-    return 'raw_' + bytesToBase64Url(bytes);
-  }
+  let total = 0;
+  for (const c of chunks) total += c.length;
+  const out = new Uint8Array(total);
+  let o = 0;
+  for (const c of chunks) { out.set(c, o); o += c.length; }
+  return out;
 }
-async function decompressData(s) {
-  if (s.startsWith('raw_')) {
-    return new TextDecoder().decode(base64UrlToBytes(s.slice(4)));
+async function gzipDecompress(bytes) {
+  if (!hasCompression) throw new Error('浏览器不支持解压');
+  const ds = new DecompressionStream('gzip');
+  const writer = ds.writable.getWriter();
+  writer.write(bytes);
+  writer.close();
+  const chunks = [];
+  const reader = ds.readable.getReader();
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
   }
-  if (s.startsWith('gz_')) {
-    const bytes = base64UrlToBytes(s.slice(3));
-    if (typeof DecompressionStream === 'undefined') {
-      throw new Error('当前浏览器不支持解压');
-    }
-    const ds = new DecompressionStream('gzip');
-    const writer = ds.writable.getWriter();
-    writer.write(bytes);
-    writer.close();
-    const chunks = [];
-    const reader = ds.readable.getReader();
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value);
-    }
-    let total = 0;
-    for (const c of chunks) total += c.length;
-    const out = new Uint8Array(total);
-    let o = 0;
-    for (const c of chunks) { out.set(c, o); o += c.length; }
-    return new TextDecoder().decode(out);
-  }
-  throw new Error('未知的编码格式');
+  let total = 0;
+  for (const c of chunks) total += c.length;
+  const out = new Uint8Array(total);
+  let o = 0;
+  for (const c of chunks) { out.set(c, o); o += c.length; }
+  return out;
 }
 
+/* --- PBKDF2 + AES-GCM 加解密 --- */
+async function deriveKey(password, salt) {
+  const enc = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw', enc.encode(password), { name: 'PBKDF2' }, false, ['deriveKey']
+  );
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt, iterations: 150000, hash: 'SHA-256' },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+async function encryptWithPassword(jsonStr, password) {
+  if (!hasSubtle) throw new Error('当前环境不支持加密（需要 HTTPS 或 localhost）');
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await deriveKey(password, salt);
+  const enc = new TextEncoder();
+  const cipherBuf = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv }, key, enc.encode(jsonStr)
+  );
+  const cipher = new Uint8Array(cipherBuf);
+  // 尝试对密文 gzip 压缩以缩短 URL
+  let body = cipher;
+  let compressed = false;
+  if (hasCompression) {
+    try {
+      const gz = await gzipCompress(cipher);
+      if (gz && gz.length < cipher.length) { body = gz; compressed = true; }
+    } catch (e) {}
+  }
+  // 结构: magic(1) + flags(1) + salt(16) + iv(12) + body
+  const out = new Uint8Array(2 + 16 + 12 + body.length);
+  out[0] = 0xA7;                      // magic
+  out[1] = compressed ? 0x01 : 0x00;  // flags: bit0 = gzip
+  out.set(salt, 2);
+  out.set(iv, 18);
+  out.set(body, 30);
+  return 'E' + bytesToBase64Url(out);
+}
+async function decryptWithPassword(encoded, password) {
+  if (!hasSubtle) throw new Error('当前环境不支持解密（需要 HTTPS 或 localhost）');
+  const raw = base64UrlToBytes(encoded);
+  if (raw[0] !== 0xA7) throw new Error('数据格式错误');
+  const flags = raw[1];
+  const salt = raw.slice(2, 18);
+  const iv = raw.slice(18, 30);
+  let body = raw.slice(30);
+  if (flags & 0x01) {
+    body = await gzipDecompress(body);
+  }
+  const key = await deriveKey(password, salt);
+  const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, body);
+  return new TextDecoder().decode(plainBuf);
+}
+
+/* --- 无密码时的压缩编码 --- */
+async function compressPayload(str) {
+  const bytes = new TextEncoder().encode(str);
+  if (!hasCompression) return 'U' + bytesToBase64Url(bytes);
+  try {
+    const gz = await gzipCompress(bytes);
+    if (gz && gz.length < bytes.length) return 'Z' + bytesToBase64Url(gz);
+  } catch (e) {}
+  return 'U' + bytesToBase64Url(bytes);
+}
+async function decompressPayload(encoded) {
+  const prefix = encoded[0];
+  const body = encoded.slice(1);
+  if (prefix === 'U') {
+    return new TextDecoder().decode(base64UrlToBytes(body));
+  }
+  if (prefix === 'Z') {
+    const bytes = base64UrlToBytes(body);
+    const plain = await gzipDecompress(bytes);
+    return new TextDecoder().decode(plain);
+  }
+  // 兼容旧格式（无前缀）
+  if (encoded.startsWith('raw_')) return new TextDecoder().decode(base64UrlToBytes(encoded.slice(4)));
+  if (encoded.startsWith('gz_')) {
+    const bytes = base64UrlToBytes(encoded.slice(3));
+    const plain = await gzipDecompress(bytes);
+    return new TextDecoder().decode(plain);
+  }
+  // 尝试直接 base64 解码
+  return new TextDecoder().decode(base64UrlToBytes(encoded));
+}
+
+/* --- 分享数据打包 --- */
 function stripImagesForShare() {
   return {
-    v: 9,
     freeMove: state.freeMove,
     autoLayoutOnToggle,
     zoom,
@@ -2991,75 +3048,194 @@ function stripImagesForShare() {
   };
 }
 
-async function openShareDialog() {
-  shareBody.innerHTML = '<div style="padding:30px;text-align:center;color:#8a97ab">正在生成分享链接…</div>';
+/* --- 分享弹窗 --- */
+function openShareDialog() {
+  if (!state.nodes.length) return toast('还没有任何节点可分享');
+  renderShareForm();
   shareMask.classList.add('show');
+}
+
+function renderShareForm() {
+  const isLocal = location.protocol === 'file:';
+  const imgCount = state.nodes.reduce((s, n) => s + (n.images?.length || 0), 0);
+
+  let localHint = '';
+  if (isLocal) {
+    localHint = `<div class="share-hint warn">
+      💡 当前是本地文件模式（<code>file://</code>），加密功能可能不可用。<br>
+      建议把 HTML 文件放到局域网 HTTP 服务下再分享，例如：<code>python -m http.server 8000</code>
+    </div>`;
+  }
+  if (!hasSubtle) {
+    localHint += `<div class="share-hint warn">
+      ⚠ 当前浏览器环境不支持 Web Crypto（需 HTTPS 或 localhost），<b>密码加密不可用</b>。
+      您可以仍使用不含密码的压缩分享，但无加密保护。
+    </div>`;
+  }
+
+  const imgHint = imgCount > 0
+    ? `<div class="share-hint warn">⚠ 当前有 ${imgCount} 张截图，出于链接长度考虑，分享链接不包含截图。</div>`
+    : '';
+
+  shareBody.innerHTML = `
+    ${localHint}
+    ${imgHint}
+
+    <div class="share-field">
+      <label>🔑 访问密码（可选，建议设置）</label>
+      <div class="pw-input-wrap">
+        <input type="password" id="sharePw" placeholder="留空则不加密；建议 6 位以上" ${!hasSubtle ? 'disabled' : ''}>
+        <button type="button" class="pw-toggle" id="sharePwToggle">👁</button>
+      </div>
+    </div>
+
+    <div class="share-row">
+      <div class="share-field">
+        <label>⏱ 链接有效期</label>
+        <select id="shareExpire">
+          <option value="3600000">1 小时</option>
+          <option value="86400000" selected>1 天</option>
+          <option value="604800000">7 天</option>
+          <option value="2592000000">30 天</option>
+          <option value="0">永久</option>
+        </select>
+      </div>
+      <div class="share-field">
+        <label>👤 分享备注（可选）</label>
+        <input type="text" id="shareNote" placeholder="如：给客户的报价版本">
+      </div>
+    </div>
+
+    <label class="share-checkbox">
+      <input type="checkbox" id="shareReadOnly" checked>
+      🔒 只读模式（接收者只能查看，不能修改）
+    </label>
+
+    <div style="margin-top:14px">
+      <button class="tbtn success" id="shareGenBtn" style="width:100%;padding:10px">🔗 生成安全分享链接</button>
+    </div>
+
+    <div id="shareResult"></div>
+  `;
+
+  // 密码显示切换
+  const pwInput = document.getElementById('sharePw');
+  const pwToggle = document.getElementById('sharePwToggle');
+  if (pwToggle) {
+    pwToggle.onclick = () => {
+      if (pwInput.type === 'password') { pwInput.type = 'text'; pwToggle.textContent = '🙈'; }
+      else { pwInput.type = 'password'; pwToggle.textContent = '👁'; }
+    };
+  }
+
+  document.getElementById('shareGenBtn').onclick = generateShareLink;
+}
+
+async function generateShareLink() {
+  const pwInput = document.getElementById('sharePw');
+  const expireSel = document.getElementById('shareExpire');
+  const noteInput = document.getElementById('shareNote');
+  const roCheck = document.getElementById('shareReadOnly');
+  const resultEl = document.getElementById('shareResult');
+
+  const password = pwInput ? pwInput.value : '';
+  const expireMs = Number(expireSel?.value || 0);
+  const sharerNote = noteInput ? noteInput.value.trim() : '';
+  const readOnlyFlag = !!(roCheck && roCheck.checked);
+
+  if (password && !hasSubtle) {
+    return toast('当前环境不支持加密，请留空密码或切换浏览器');
+  }
+  if (password && password.length < 4) {
+    return toast('密码太短，至少 4 位');
+  }
+
+  resultEl.innerHTML = '<div style="padding:14px;text-align:center;color:#8a97ab">正在生成…</div>';
 
   try {
-    const data = stripImagesForShare();
-    const json = JSON.stringify(data);
-    const encoded = await compressData(json);
+    const now = Date.now();
+    const payload = {
+      v: 10,
+      meta: {
+        createdAt: now,
+        expiresAt: expireMs > 0 ? now + expireMs : null,
+        readOnly: readOnlyFlag,
+        sharerNote,
+        encrypted: !!password
+      },
+      data: stripImagesForShare()
+    };
+    const json = JSON.stringify(payload);
+
+    let hashPart;
+    if (password) {
+      const encoded = await encryptWithPassword(json, password);
+      hashPart = 'enc=' + encoded;
+    } else {
+      const encoded = await compressPayload(json);
+      hashPart = 'data=' + encoded;
+    }
 
     const baseUrl = location.href.split('#')[0];
-    const shareUrl = `${baseUrl}#data=${encoded}`;
+    const shareUrl = `${baseUrl}#${hashPart}`;
     const urlSize = shareUrl.length;
-    const sizeStr = urlSize < 1024 ? urlSize + ' 字符'
-                  : (urlSize / 1024).toFixed(1) + ' K 字符';
-    const isLocal = location.protocol === 'file:';
+    const sizeStr = urlSize < 1024 ? urlSize + ' 字符' : (urlSize / 1024).toFixed(1) + ' K 字符';
+
+    const expireText = expireMs === 0 ? '永久有效'
+      : (() => {
+          const d = new Date(now + expireMs);
+          const p = n => String(n).padStart(2, '0');
+          return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+        })();
 
     let warnHtml = '';
     if (urlSize > 60000) {
       warnHtml = `<div class="share-hint warn">
-        ⚠ 链接较长（${sizeStr}），部分聊天软件可能会截断。
-        建议：<br>
-        1. 把链接保存为文本文件，通过 U 盘或共享文件夹发送<br>
-        2. 或者把本 HTML 文件整体放到局域网共享目录，让同事直接打开
+        ⚠ 链接较长（${sizeStr}），部分聊天软件可能截断。
+        建议：把本 HTML 文件放到局域网共享目录，让同事直接打开；或把链接存为 txt 文件发送。
       </div>`;
     }
 
-    let localHintHtml = '';
-    if (isLocal) {
-      localHintHtml = `<div class="share-hint info">
-        💡 <b>当前是本地文件模式</b>（<code>file://</code>），局域网内的同事无法直接访问您本机的文件路径。<br>
-        <b>推荐做法：</b><br>
-        1. 把本 HTML 文件放到局域网共享目录，或放到任意一台可以访问的电脑上<br>
-        2. 在该目录运行一个简单 HTTP 服务：<code>python -m http.server 8000</code><br>
-        3. 其他同事访问：<code>http://您的IP:8000/文件名.html#data=…</code>
-      </div>`;
-    } else {
-      localHintHtml = `<div class="share-hint info">
-        ✓ 当前页面已通过 HTTP 访问，可以把下面的链接直接发给同一局域网的同事。
-      </div>`;
-    }
+    resultEl.innerHTML = `
+      <div style="margin-top:18px;border-top:1px dashed #2a3341;padding-top:14px">
+        <div class="share-hint ${password ? 'ok' : 'warn'}">
+          ${password ? '🔐 已启用密码加密（PBKDF2 + AES-GCM 256）' : '⚠ 未设置密码，链接任何持有者都可查看'}
+        </div>
+        <div class="share-meta-card">
+          <div class="share-meta-row">
+            <span class="k">加密</span>
+            <span class="v ${password ? 'hl' : 'danger'}">${password ? '已加密（AES-256-GCM）' : '未加密'}</span>
+          </div>
+          <div class="share-meta-row">
+            <span class="k">有效期</span>
+            <span class="v">${escapeHtml(expireText)}</span>
+          </div>
+          <div class="share-meta-row">
+            <span class="k">访问模式</span>
+            <span class="v">${readOnlyFlag ? '🔒 只读（禁止编辑）' : '✏ 可编辑'}</span>
+          </div>
+          ${sharerNote ? `<div class="share-meta-row">
+            <span class="k">分享备注</span>
+            <span class="v">${escapeHtml(sharerNote)}</span>
+          </div>` : ''}
+          <div class="share-meta-row">
+            <span class="k">链接大小</span>
+            <span class="v">${sizeStr}</span>
+          </div>
+        </div>
 
-    const imgCount = state.nodes.reduce((s, n) => s + (n.images?.length || 0), 0);
-    const imgNote = imgCount > 0
-      ? `<div class="share-hint warn" style="margin-top:8px">⚠ 当前共 ${imgCount} 张截图，出于链接长度考虑，分享链接<b>不包含截图</b>。截图请通过其他方式单独传递。</div>`
-      : '';
+        ${warnHtml}
 
-    shareBody.innerHTML = `
-      ${localHintHtml}
-      ${warnHtml}
-      ${imgNote}
-      <div class="share-section-title">分享链接（包含所有节点数据）</div>
-      <div class="share-url-box">
-        <textarea id="shareUrlText" readonly>${escapeHtml(shareUrl)}</textarea>
-      </div>
-      <div style="display:flex;gap:8px;margin-top:8px">
-        <button class="tbtn success" id="shareCopyBtn">📋 复制链接</button>
-        <button class="tbtn" id="shareTestBtn">🔍 在新标签页打开测试</button>
-      </div>
-      <div class="share-section-title">使用步骤</div>
-      <div style="font-size:12.5px;line-height:1.9;color:var(--muted)">
-        1. 把本 HTML 文件放到局域网内其他电脑可以访问的位置（共享目录 / HTTP 服务）<br>
-        2. 点击上方「复制链接」<br>
-        3. 通过微信 / 钉钉 / 邮件把链接发给同事<br>
-        4. 同事在浏览器打开，即可看到完全一致的数据看板
-      </div>
-      <div class="share-section-title">链接大小</div>
-      <div style="font-size:12.5px;color:var(--muted)">
-        当前链接长度：<b style="color:var(--gold)">${sizeStr}</b>
-        ${urlSize > 60000 ? '（较长，建议用文件方式传递）' : ''}
+        <div class="share-url-box">
+          <textarea id="shareUrlText" readonly>${escapeHtml(shareUrl)}</textarea>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+          <button class="tbtn success" id="shareCopyBtn">📋 复制链接</button>
+          <button class="tbtn" id="shareTestBtn">🔍 打开测试</button>
+        </div>
+        ${password ? `<div class="share-hint info" style="margin-top:10px">
+          ⚠ 请通过<b>不同于链接的渠道</b>把密码告知接收者，例如口头、电话、另一条消息。
+        </div>` : ''}
       </div>
     `;
 
@@ -3068,40 +3244,157 @@ async function openShareDialog() {
         () => toast('链接已复制到剪贴板'),
         () => {
           const ta = document.getElementById('shareUrlText');
-          ta.select();
-          document.execCommand('copy');
-          toast('链接已复制');
+          ta.select(); document.execCommand('copy'); toast('链接已复制');
         }
       );
     };
-    document.getElementById('shareTestBtn').onclick = () => {
-      window.open(shareUrl, '_blank');
-    };
+    document.getElementById('shareTestBtn').onclick = () => window.open(shareUrl, '_blank');
   } catch (err) {
     console.error(err);
-    shareBody.innerHTML = `<div style="color:#ff9d9d;padding:20px">
-      生成分享链接失败：${escapeHtml(err.message || err)}
+    resultEl.innerHTML = `<div class="share-hint warn" style="margin-top:14px">
+      生成失败：${escapeHtml(err.message || err)}
     </div>`;
   }
 }
 
 document.getElementById('shareClose').onclick = () => shareMask.classList.remove('show');
 document.getElementById('shareOk').onclick = () => shareMask.classList.remove('show');
-shareMask.addEventListener('click', e => {
-  if (e.target === shareMask) shareMask.classList.remove('show');
+shareMask.addEventListener('click', e => { if (e.target === shareMask) shareMask.classList.remove('show'); });
+
+/* =========================================================================
+ *  密码输入弹窗
+ * ========================================================================= */
+let pwResolve = null;
+
+function openPasswordPrompt(info = {}) {
+  return new Promise(resolve => {
+    pwResolve = resolve;
+    const { title = '需要密码解密', sharerNote = '', error = '' } = info;
+    pwBody.innerHTML = `
+      <div class="share-hint info" style="margin-bottom:14px">
+        此链接已被加密，请输入分享者提供的访问密码。
+      </div>
+      ${sharerNote ? `<div class="share-meta-card"><div class="share-meta-row">
+        <span class="k">分享备注</span><span class="v">${escapeHtml(sharerNote)}</span>
+      </div></div>` : ''}
+      ${error ? `<div class="share-hint warn" style="color:#ff8d8d;border-color:rgba(239,68,68,.4);background:rgba(239,68,68,.08)">${escapeHtml(error)}</div>` : ''}
+      <div class="share-field">
+        <label>密码</label>
+        <div class="pw-input-wrap">
+          <input type="password" id="pwInput" placeholder="请输入密码" autocomplete="off">
+          <button type="button" class="pw-toggle" id="pwToggle">👁</button>
+        </div>
+      </div>
+    `;
+    const inp = document.getElementById('pwInput');
+    const tg = document.getElementById('pwToggle');
+    tg.onclick = () => {
+      if (inp.type === 'password') { inp.type = 'text'; tg.textContent = '🙈'; }
+      else { inp.type = 'password'; tg.textContent = '👁'; }
+    };
+    setTimeout(() => inp.focus(), 60);
+    inp.onkeydown = ev => {
+      if (ev.key === 'Enter') { ev.preventDefault(); document.getElementById('pwSubmit').click(); }
+    };
+    pwMask.classList.add('show');
+  });
+}
+document.getElementById('pwSubmit').onclick = () => {
+  const inp = document.getElementById('pwInput');
+  const pw = inp ? inp.value : '';
+  if (!pw) return toast('请输入密码');
+  if (pwResolve) { pwResolve(pw); pwResolve = null; }
+};
+document.getElementById('pwCancel').onclick = () => {
+  pwMask.classList.remove('show');
+  if (pwResolve) { pwResolve(null); pwResolve = null; }
+};
+document.getElementById('pwClose').onclick = () => {
+  pwMask.classList.remove('show');
+  if (pwResolve) { pwResolve(null); pwResolve = null; }
+};
+pwMask.addEventListener('click', e => {
+  if (e.target === pwMask) {
+    pwMask.classList.remove('show');
+    if (pwResolve) { pwResolve(null); pwResolve = null; }
+  }
 });
 
 /* =========================================================================
- *  从 URL hash 恢复数据（分享链接）
+ *  从 URL hash 恢复数据
  * ========================================================================= */
 async function tryRestoreFromHash() {
   const hash = location.hash || '';
-  const m = hash.match(/[#&]data=([^&]+)/);
+  if (!hash) return false;
+
+  // 匹配 enc= / data= / raw= / gz=
+  const m = hash.match(/[#&](enc|data|raw|gz)=([^&]+)/);
   if (!m) return false;
+
+  const kind = m[1];
+  const encoded = decodeURIComponent(m[2]);
+
   try {
-    const decoded = decodeURIComponent(m[1]);
-    const json = await decompressData(decoded);
-    const data = JSON.parse(json);
+    let json;
+    let meta = null;
+
+    if (kind === 'enc') {
+      // 加密链接：提示输入密码
+      let pw = await openPasswordPrompt({ sharerNote: '' });
+      let attempts = 0;
+      while (pw !== null && attempts < 5) {
+        try {
+          json = await decryptWithPassword(encoded, pw);
+          break;
+        } catch (e) {
+          attempts++;
+          pwMask.classList.remove('show');
+          if (attempts >= 5) {
+            toast('密码尝试次数过多，已放弃');
+            history.replaceState(null, '', location.pathname + location.search);
+            return false;
+          }
+          pw = await openPasswordPrompt({ error: `密码错误（${attempts}/5），请重试` });
+        }
+      }
+      pwMask.classList.remove('show');
+      if (json === undefined) {
+        // 用户取消
+        history.replaceState(null, '', location.pathname + location.search);
+        return false;
+      }
+    } else {
+      json = await decompressPayload(encoded);
+    }
+
+    const parsed = JSON.parse(json);
+    // 新格式：{v, meta, data}
+    let data, metaInfo = null;
+    if (parsed && parsed.data && parsed.meta) {
+      data = parsed.data;
+      metaInfo = parsed.meta;
+    } else {
+      // 兼容旧格式：直接是节点数据
+      data = parsed;
+    }
+
+    // 校验有效期
+    if (metaInfo && metaInfo.expiresAt) {
+      if (Date.now() > metaInfo.expiresAt) {
+        const d = new Date(metaInfo.expiresAt);
+        const p = n => String(n).padStart(2, '0');
+        openModal('分享链接已过期', `
+          <div class="share-hint warn">
+            此分享链接已于 <b>${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}</b> 过期。<br>
+            请联系分享者重新生成。
+          </div>
+        `, '', { showCopy: false });
+        history.replaceState(null, '', location.pathname + location.search);
+        return false;
+      }
+    }
+
+    // 加载数据
     if (!data.nodes || !Array.isArray(data.nodes)) throw new Error('数据格式错误');
 
     state.nodes = data.nodes.map(n => ({
@@ -3114,23 +3407,43 @@ async function tryRestoreFromHash() {
     }));
     state.edges = data.edges || [];
     state.freeMove = !!data.freeMove;
-    if (typeof data.autoLayoutOnToggle === 'boolean') {
-      autoLayoutOnToggle = data.autoLayoutOnToggle;
+    if (typeof data.autoLayoutOnToggle === 'boolean') autoLayoutOnToggle = data.autoLayoutOnToggle;
+
+    // 只读
+    if (metaInfo && metaInfo.readOnly) {
+      readOnlyMode = true;
     }
+
     render();
     if (data.zoom && data.zoom !== 1) applyZoom(data.zoom);
-    toast('已从分享链接加载数据（' + state.nodes.length + ' 个节点）');
+    applyReadOnlyUI();
+
+    // 展示分享信息
+    const metaLine = [];
+    if (metaInfo) {
+      if (metaInfo.sharerNote) metaLine.push(`📝 ${metaInfo.sharerNote}`);
+      if (metaInfo.expiresAt) {
+        const d = new Date(metaInfo.expiresAt);
+        const p = n => String(n).padStart(2, '0');
+        metaLine.push(`⏱ 有效至 ${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`);
+      }
+    }
+    if (readOnlyMode) metaLine.push('🔒 只读模式');
+
+    toast(`已加载分享数据（${state.nodes.length} 个节点）` + (metaLine.length ? ' · ' + metaLine.join(' · ') : ''));
+
     history.replaceState(null, '', location.pathname + location.search);
     return true;
   } catch (e) {
     console.error('从分享链接恢复失败', e);
     toast('分享链接解析失败：' + (e.message || e));
+    history.replaceState(null, '', location.pathname + location.search);
     return false;
   }
 }
 
 /* =========================================================================
- *  CSV 解析 & 导入
+ *  CSV 导入
  * ========================================================================= */
 const importMask = document.getElementById('importMask');
 const importBody = document.getElementById('importBody');
@@ -3144,11 +3457,7 @@ let importState = {
 
 function parseCSV(text) {
   if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
-  const rows = [];
-  let row = [];
-  let cell = '';
-  let i = 0;
-  let inQuotes = false;
+  const rows = []; let row = []; let cell = ''; let i = 0; let inQuotes = false;
   while (i < text.length) {
     const c = text[i];
     if (inQuotes) {
@@ -3168,11 +3477,9 @@ function parseCSV(text) {
   if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
   return rows;
 }
-
 function parseRuleToken(token) {
   const t = token.trim();
   if (!t) return null;
-
   let m = t.match(/^(选项|choice|C)\s*[:：]\s*(.+)$/i);
   if (m) {
     const opts = m[2].split(/[|｜]/).map(s => s.trim()).filter(Boolean).map(s => {
@@ -3181,13 +3488,8 @@ function parseRuleToken(token) {
       return { code: s, label: s };
     });
     if (!opts.length) return null;
-    return {
-      type: 'choice',
-      options: opts.map(o => `${o.code}:${o.label}`).join(','),
-      selected: opts[0].code
-    };
+    return { type: 'choice', options: opts.map(o => `${o.code}:${o.label}`).join(','), selected: opts[0].code };
   }
-
   m = t.match(/^(序号|seq|S)\s*[:：]\s*(.+)$/i);
   if (m) {
     const parts = m[2].split(/[|｜]/).map(s => s.trim());
@@ -3196,31 +3498,22 @@ function parseRuleToken(token) {
     const auto = parts[2] && /^(自动|auto|是|yes|1|true)$/i.test(parts[2]);
     return { type: 'seq', value, digits, auto: !!auto };
   }
-
   m = t.match(/^(日期|date|D)\s*[:：]\s*(.*)$/i);
   if (m) return { type: 'date', format: m[2].trim() || 'YYYYMMDD' };
-
   m = t.match(/^(固定文本|固定|fixed|F)\s*[:：]\s*(.+)$/i);
   if (m) return { type: 'fixed', text: m[2] };
-
   return { type: 'fixed', text: t };
 }
-
 function detectColumns(rows) {
-  if (!rows.length) {
-    return { hasHeader: false, colMap: { name: 0, parent: 1, baseId: 2, note: 3, rules: [4] } };
-  }
+  if (!rows.length) return { hasHeader: false, colMap: { name: 0, parent: 1, baseId: 2, note: 3, rules: [4] } };
   const first = rows[0].map(c => String(c || '').trim().toLowerCase());
-  const headerKeywords = ['名称', 'name', 'title', '节点名称', '父节点', 'parent',
-                          '起始id', 'baseid', '备注', 'note', '规则', 'rules', '字段', 'field'];
+  const headerKeywords = ['名称','name','title','节点名称','父节点','parent','起始id','baseid','备注','note','规则','rules','字段','field'];
   const isHeader = first.some(c => headerKeywords.some(k => c === k.toLowerCase() || c.includes(k.toLowerCase())));
-
   if (!isHeader) {
     const rulesCols = [];
     for (let i = 4; i < Math.max(5, first.length); i++) rulesCols.push(i);
     return { hasHeader: false, colMap: { name: 0, parent: 1, baseId: 2, note: 3, rules: rulesCols } };
   }
-
   const colMap = { name: -1, parent: -1, baseId: -1, note: -1, rules: [] };
   first.forEach((h, i) => {
     if (colMap.name < 0 && /^(名称|节点名称|name|title|产品名称)$/i.test(h)) colMap.name = i;
@@ -3233,29 +3526,22 @@ function detectColumns(rows) {
   if (colMap.parent < 0) colMap.parent = 1;
   if (colMap.baseId < 0) colMap.baseId = 2;
   if (colMap.note < 0) colMap.note = 3;
-  if (!colMap.rules.length) {
-    for (let i = 4; i < first.length; i++) colMap.rules.push(i);
-  }
+  if (!colMap.rules.length) for (let i = 4; i < first.length; i++) colMap.rules.push(i);
   return { hasHeader: true, colMap };
 }
-
 function buildImportData(rows) {
   const { hasHeader, colMap } = detectColumns(rows);
   const startRow = hasHeader ? 1 : 0;
   const errors = [], warnings = [], entries = [];
-
   for (let i = startRow; i < rows.length; i++) {
     const row = rows[i];
     if (!row || !row.length) continue;
     if (row.every(c => !String(c || '').trim())) continue;
-
     const name = String(row[colMap.name] || '').trim();
     if (!name) { errors.push({ row: i + 1, msg: '名称为空' }); continue; }
-
     const parentRef = String(row[colMap.parent] || '').trim();
     const baseId    = String(row[colMap.baseId] || '').trim();
     const note      = String(row[colMap.note] || '').trim();
-
     let ruleTokens = [];
     for (const ci of colMap.rules) {
       const cell = row[ci];
@@ -3264,10 +3550,8 @@ function buildImportData(rows) {
       }
     }
     const rules = ruleTokens.map(parseRuleToken).filter(Boolean);
-
     entries.push({ rowIdx: i + 1, name, parentRef, baseId, note, rules });
   }
-
   const existingByName = new Map();
   const existingById = new Map();
   for (const n of state.nodes) {
@@ -3275,19 +3559,14 @@ function buildImportData(rows) {
     const id = computeId(n);
     if (id && !existingById.has(id)) existingById.set(id, n);
   }
-
   const nameCount = new Map();
   for (const e of entries) nameCount.set(e.name, (nameCount.get(e.name) || 0) + 1);
   for (const [nm, cnt] of nameCount) {
-    if (cnt > 1 && !existingByName.has(nm)) {
-      warnings.push({ row: '-', msg: `名称「${nm}」在导入数据中重复 ${cnt} 次` });
-    }
+    if (cnt > 1 && !existingByName.has(nm)) warnings.push({ row: '-', msg: `名称「${nm}」在导入数据中重复 ${cnt} 次` });
   }
-
   const pending = entries.map(e => ({ ...e, node: null, parent: null }));
   let changed = true, iter = 0;
   const resolvedMap = new Map();
-
   while (pending.length && changed && iter++ < 200) {
     changed = false;
     for (let i = pending.length - 1; i >= 0; i--) {
@@ -3299,68 +3578,47 @@ function buildImportData(rows) {
         if (!parentNode) parentNode = existingById.get(item.parentRef) || null;
         if (!parentNode) continue;
       }
-
       const kind = parentNode ? 'rule' : 'root';
       const depth = parentNode ? ((computeNodeDepth().get(parentNode.id) ?? 0) + 1) : 0;
       const node = {
-        id: uid('n'), kind, title: item.name,
-        x: 0, y: 0,
+        id: uid('n'), kind, title: item.name, x: 0, y: 0,
         baseId: kind === 'root' ? (item.baseId || 'AB') : undefined,
-        rules: kind === 'rule'
-          ? (item.rules.length ? item.rules : [{ type: 'seq', value: 1, digits: 2, auto: true }])
-          : undefined,
-        note: item.note || '',
-        images: [], collapsed: false,
-        color: levelColorOf(depth)
+        rules: kind === 'rule' ? (item.rules.length ? item.rules : [{ type: 'seq', value: 1, digits: 2, auto: true }]) : undefined,
+        note: item.note || '', images: [], collapsed: false, color: levelColorOf(depth)
       };
-      item.node = node;
-      item.parent = parentNode;
+      item.node = node; item.parent = parentNode;
       pending.splice(i, 1);
       resolvedMap.set(item.name, node);
       changed = true;
     }
   }
-
-  for (const item of pending) {
-    errors.push({ row: item.rowIdx, msg: `父节点「${item.parentRef}」未找到或存在循环引用` });
-  }
-
+  for (const item of pending) errors.push({ row: item.rowIdx, msg: `父节点「${item.parentRef}」未找到或存在循环引用` });
   const builtNodes = [], builtEdges = [];
   const resolved = entries.filter(e => e.node);
   for (const item of resolved) {
     builtNodes.push(item.node);
-    if (item.parent) {
-      builtEdges.push({ id: uid('e'), from: item.parent.id, to: item.node.id });
-    }
+    if (item.parent) builtEdges.push({ id: uid('e'), from: item.parent.id, to: item.node.id });
   }
-
   const savedNodes = state.nodes, savedEdges = state.edges;
   state.nodes = [...savedNodes, ...builtNodes];
   state.edges = [...savedEdges, ...builtEdges];
   let preview;
   try {
     preview = builtNodes.map(n => ({
-      node: n,
-      name: n.title,
+      node: n, name: n.title,
       parentName: n.kind === 'root' ? '' : (parentOf(n.id)?.title || ''),
-      id: computeId(n),
-      kind: n.kind,
+      id: computeId(n), kind: n.kind,
       ruleCount: n.rules ? n.rules.length : 0,
       ruleSummary: n.kind === 'rule' ? summarizeRules(n.rules) : '',
       error: null
     }));
     const conflicts = checkDuplicates();
-    for (const p of preview) {
-      if (conflicts.has(p.node.id)) p.error = '同级重复';
-    }
+    for (const p of preview) if (conflicts.has(p.node.id)) p.error = '同级重复';
   } finally {
-    state.nodes = savedNodes;
-    state.edges = savedEdges;
+    state.nodes = savedNodes; state.edges = savedEdges;
   }
-
   return { builtNodes, builtEdges, errors, warnings, preview };
 }
-
 function summarizeRules(rules) {
   return rules.map(r => {
     switch (r.type) {
@@ -3372,43 +3630,27 @@ function summarizeRules(rules) {
     return '';
   }).join(' | ');
 }
-
 function renderImportDialog() {
   const body = importBody;
-
   if (!importState.fileName) {
     body.innerHTML = `
-      <div class="import-drop" id="importDrop">
-        <div class="id-icon">📥</div>
-        <div class="id-title">拖放 CSV 文件到此处，或点击选择</div>
-        <div class="id-hint">支持 UTF-8 / GBK 编码，第一行可以是表头</div>
+      <div class="import-drop" id="importDrop" style="border:2px dashed #2a3341;border-radius:12px;padding:26px 20px;text-align:center;cursor:pointer;background:#0f141c">
+        <div style="font-size:38px;margin-bottom:6px">📥</div>
+        <div style="font-weight:600;font-size:14px;margin-bottom:4px">拖放 CSV 文件到此处，或点击选择</div>
+        <div style="color:#8a97ab;font-size:12px;margin-top:6px">支持 UTF-8 / GBK 编码</div>
       </div>
-      <div class="import-help">
-        <b>CSV 列格式说明：</b>
-        <div class="rules-list">
-          <div><span class="k">名称</span><span>必填，节点名称</span></div>
-          <div><span class="k">父节点</span><span>上级节点的名称或订货号，留空表示起始节点</span></div>
-          <div><span class="k">起始ID</span><span>仅起始节点使用，如 <code>AB</code></span></div>
-          <div><span class="k">备注</span><span>可选</span></div>
-          <div><span class="k">规则1/2/3…</span><span>每个单元格写 1 个或多个规则，用 <code>;</code> 分隔</span></div>
-        </div>
-        <b>规则写法：</b>
-        <div class="rules-list">
-          <div><span class="k">固定文本</span><span>直接写文本，如 <code>-A</code>；或 <code>固定:-A</code></span></div>
-          <div><span class="k">选项</span><span><code>选项:01:红色|02:蓝色</code></span></div>
-          <div><span class="k">序号</span><span><code>序号:1|2|自动</code>（起始|位数|是否自动）</span></div>
-          <div><span class="k">日期</span><span><code>日期:YYYYMMDD</code></span></div>
-        </div>
+      <div class="share-hint info" style="margin-top:12px">
+        <b>CSV 列格式：</b>名称 | 父节点 | 起始ID | 备注 | 规则1 | 规则2…<br>
+        规则写法：<code>选项:01:红|02:蓝</code>、<code>序号:1|2|自动</code>、<code>日期:YYYYMMDD</code>、<code>-A</code>
       </div>
     `;
     const drop = document.getElementById('importDrop');
     if (drop) {
       drop.onclick = () => pickCSVFile();
-      drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('drag-over'); });
-      drop.addEventListener('dragleave', () => drop.classList.remove('drag-over'));
+      drop.addEventListener('dragover', e => { e.preventDefault(); drop.style.borderColor = '#4c8dff'; });
+      drop.addEventListener('dragleave', () => drop.style.borderColor = '#2a3341');
       drop.addEventListener('drop', e => {
-        e.preventDefault();
-        drop.classList.remove('drag-over');
+        e.preventDefault(); drop.style.borderColor = '#2a3341';
         const f = e.dataTransfer.files[0];
         if (f) handleCSVFile(f);
       });
@@ -3417,97 +3659,60 @@ function renderImportDialog() {
     importClearFileBtn.style.display = 'none';
     return;
   }
-
   const { fileName, fileSize, parsedRows, builtNodes, errors, warnings, previewRows } = importState;
-  const errCount = errors.length;
-  const warnCount = warnings.length;
-  const nodeCount = builtNodes.length;
   const sizeStr = fileSize < 1024 ? fileSize + ' B'
-                : fileSize < 1024 * 1024 ? (fileSize / 1024).toFixed(1) + ' KB'
-                : (fileSize / 1024 / 1024).toFixed(2) + ' MB';
-
+                : fileSize < 1024*1024 ? (fileSize/1024).toFixed(1) + ' KB'
+                : (fileSize/1024/1024).toFixed(2) + ' MB';
   let html = `
-    <div class="import-file-info">
-      <div class="fi-icon">📄</div>
-      <div class="fi-main">
-        <div class="fi-name">${escapeHtml(fileName)}</div>
-        <div class="fi-meta">${sizeStr} · 共 ${parsedRows.length} 行数据</div>
+    <div style="display:flex;gap:10px;background:#0f141c;border:1px solid #2a3341;border-radius:10px;padding:10px 14px;margin-bottom:12px">
+      <div style="font-size:22px">📄</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(fileName)}</div>
+        <div style="color:#8a97ab;font-size:11.5px;margin-top:2px">${sizeStr} · 共 ${parsedRows.length} 行</div>
       </div>
     </div>
-    <div class="import-stats">
-      <span class="ist-chip ok">✓ 将创建 ${nodeCount} 个节点</span>
-      ${warnCount ? `<span class="ist-chip warn">⚠ ${warnCount} 条警告</span>` : ''}
-      ${errCount  ? `<span class="ist-chip err">✗ ${errCount} 条错误</span>` : ''}
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+      <span style="display:inline-flex;padding:5px 11px;border-radius:7px;font-size:12px;color:#7ddc9a;border:1px solid rgba(125,220,154,.35);background:#0f141c">✓ 将创建 ${builtNodes.length} 个节点</span>
+      ${warnings.length ? `<span style="display:inline-flex;padding:5px 11px;border-radius:7px;font-size:12px;color:#ffb74d;border:1px solid rgba(255,183,77,.35);background:#0f141c">⚠ ${warnings.length} 条警告</span>` : ''}
+      ${errors.length ? `<span style="display:inline-flex;padding:5px 11px;border-radius:7px;font-size:12px;color:#ef4444;border:1px solid rgba(239,68,68,.35);background:#0f141c">✗ ${errors.length} 条错误</span>` : ''}
     </div>
-    <div class="import-options">
-      <label><input type="radio" name="impMode" value="append" checked> 追加到当前画布</label>
-      <label><input type="radio" name="impMode" value="replace"> 清空后导入</label>
-      <label><input type="checkbox" id="impAutoLayout" checked> 导入后自动排版</label>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;background:#0f141c;border:1px solid #2a3341;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:12.5px">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="radio" name="impMode" value="append" checked> 追加到当前画布</label>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="radio" name="impMode" value="replace"> 清空后导入</label>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="impAutoLayout" checked> 导入后自动排版</label>
     </div>
   `;
-
   if (errors.length) {
-    html += `<div class="import-help" style="border-color:rgba(239,68,68,.4);background:rgba(239,68,68,.06);color:#ff9d9d">
-      <b>❌ 错误（这些行将被跳过）：</b>
-      <div class="rules-list">
-        ${errors.slice(0, 10).map(e => `<div><span class="k">第 ${e.row} 行</span><span>${escapeHtml(e.msg)}</span></div>`).join('')}
-      </div>
-    </div>`;
+    html += `<div class="share-hint warn"><b>❌ 错误（将跳过）：</b><br>${errors.slice(0,10).map(e => `第 ${e.row} 行 · ${escapeHtml(e.msg)}`).join('<br>')}</div>`;
   }
-  if (warnings.length) {
-    html += `<div class="import-help" style="border-color:rgba(255,183,77,.4);background:rgba(255,183,77,.06);color:#ffce7a">
-      <b>⚠ 警告：</b>
-      <div class="rules-list">
-        ${warnings.slice(0, 5).map(w => `<div><span class="k">第 ${w.row} 行</span><span>${escapeHtml(w.msg)}</span></div>`).join('')}
-      </div>
-    </div>`;
-  }
-
-  html += `<div style="margin:12px 0 6px;font-size:12px;color:var(--muted)">节点预览：</div>
-    <div class="import-preview">
-      <div class="import-row head">
-        <span>状态</span><span>名称</span><span>父节点</span><span>订货号</span><span>规则</span>
-      </div>`;
-  const showRows = previewRows.slice(0, 200);
+  html += `<div style="margin:12px 0 6px;font-size:12px;color:#8a97ab">节点预览：</div>
+    <div style="max-height:280px;overflow:auto;border:1px solid #2a3341;border-radius:8px;background:#0f141c">`;
+  const showRows = previewRows.slice(0, 150);
   for (const p of showRows) {
     const statusIcon = p.error ? '⚠' : '✓';
-    const statusCls = p.error ? 'warn' : 'ok';
+    const statusColor = p.error ? '#ffb74d' : '#7ddc9a';
     const parentTxt = p.kind === 'root' ? '（起始节点）' : (p.parentName || '—');
-    const parentCls = p.kind === 'root' ? 'iparent root' : 'iparent';
     const idTxt = p.id == null ? '未连接' : (p.id || '（空）');
-    const idCls = p.error === '同级重复' ? 'iid err' : 'iid';
-    html += `<div class="import-row">
-      <span class="ist ${statusCls}">${statusIcon}</span>
-      <span class="iname">${escapeHtml(p.name)}</span>
-      <span class="${parentCls}">${escapeHtml(parentTxt)}</span>
-      <span class="${idCls}">${escapeHtml(idTxt)}</span>
-      <span class="irule">${escapeHtml(p.ruleSummary || '')}</span>
-    </div>`;
-  }
-  if (previewRows.length > showRows.length) {
-    html += `<div class="import-row" style="justify-content:center;color:var(--muted);font-size:11px">
-      还有 ${previewRows.length - showRows.length} 个节点…
+    html += `<div style="display:grid;grid-template-columns:30px 1.1fr 1fr 1.4fr 1.6fr;gap:8px;padding:7px 11px;border-bottom:1px solid #1a212e;font-size:12px;align-items:center">
+      <span style="text-align:center;color:${statusColor}">${statusIcon}</span>
+      <span style="font-weight:600">${escapeHtml(p.name)}</span>
+      <span style="color:#8a97ab">${escapeHtml(parentTxt)}</span>
+      <span style="font-family:ui-monospace,monospace;color:#ffb74d;word-break:break-all">${escapeHtml(idTxt)}</span>
+      <span style="color:#7a8a9f;font-size:11px">${escapeHtml(p.ruleSummary || '')}</span>
     </div>`;
   }
   html += `</div>`;
-
   body.innerHTML = html;
-  importRunBtn.disabled = nodeCount === 0;
-  importRunBtn.textContent = `导入 ${nodeCount} 个节点`;
+  importRunBtn.disabled = builtNodes.length === 0;
+  importRunBtn.textContent = `导入 ${builtNodes.length} 个节点`;
   importClearFileBtn.style.display = '';
 }
-
 function pickCSVFile() {
   const inp = document.createElement('input');
-  inp.type = 'file';
-  inp.accept = '.csv,text/csv,text/plain';
-  inp.onchange = () => {
-    const f = inp.files[0];
-    if (f) handleCSVFile(f);
-  };
+  inp.type = 'file'; inp.accept = '.csv,text/csv,text/plain';
+  inp.onchange = () => { const f = inp.files[0]; if (f) handleCSVFile(f); };
   inp.click();
 }
-
 async function handleCSVFile(file) {
   try {
     const buffer = await file.arrayBuffer();
@@ -3517,7 +3722,6 @@ async function handleCSVFile(file) {
     }
     const rows = parseCSV(text);
     if (!rows.length) { toast('文件为空'); return; }
-
     const built = buildImportData(rows);
     importState.fileName = file.name;
     importState.fileSize = file.size;
@@ -3529,12 +3733,11 @@ async function handleCSVFile(file) {
     importState.previewRows = built.preview;
     renderImportDialog();
   } catch (err) {
-    console.error(err);
-    toast('读取文件失败：' + (err.message || err));
+    console.error(err); toast('读取文件失败：' + (err.message || err));
   }
 }
-
 function openImportDialog() {
+  if (guardReadOnly()) return;
   importState = { fileName: '', fileSize: 0, parsedRows: [], builtNodes: [], builtEdges: [], errors: [], warnings: [], previewRows: [] };
   renderImportDialog();
   importMask.classList.add('show');
@@ -3546,7 +3749,6 @@ document.getElementById('importClose').onclick = closeImportDialog;
 document.getElementById('importCancel').onclick = closeImportDialog;
 importMask.addEventListener('click', e => { if (e.target === importMask) closeImportDialog(); });
 importClearFileBtn.onclick = () => { importState.fileName = ''; renderImportDialog(); };
-
 document.getElementById('importTemplate').onclick = () => {
   const tpl = [
     ['名称', '父节点', '起始ID', '备注', '规则1', '规则2'],
@@ -3565,13 +3767,12 @@ document.getElementById('importTemplate').onclick = () => {
   downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), '订货号导入模板.csv');
   toast('模板已下载');
 };
-
 importRunBtn.onclick = () => {
+  if (guardReadOnly()) return;
   const { builtNodes, builtEdges, errors } = importState;
   if (!builtNodes.length) return toast('没有可导入的节点');
   const mode = document.querySelector('input[name="impMode"]:checked')?.value || 'append';
   const autoLayoutAfter = document.getElementById('impAutoLayout')?.checked;
-
   if (mode === 'replace') {
     if (!confirm(`将清空当前 ${state.nodes.length} 个节点，替换为导入的 ${builtNodes.length} 个节点。继续？`)) return;
     state.nodes = []; state.edges = []; selectedIds.clear();
@@ -3581,9 +3782,7 @@ importRunBtn.onclick = () => {
   closeImportDialog();
   render(); markDirty();
   toast(`成功导入 ${builtNodes.length} 个节点` + (errors.length ? `（${errors.length} 行被跳过）` : ''));
-  if (autoLayoutAfter && state.nodes.length) {
-    setTimeout(() => autoLayout('vertical'), 50);
-  }
+  if (autoLayoutAfter && state.nodes.length) setTimeout(() => autoLayout('vertical'), 50);
 };
 
 /* =========================================================================
@@ -3598,9 +3797,9 @@ const saveStatusEl = document.getElementById('saveStatus');
 
 function serialize() {
   return JSON.stringify({
-    v: 9,
+    v: 10,
     freeMove: state.freeMove,
-    autoLayoutOnToggle,           // ★ 保存自动排版开关
+    autoLayoutOnToggle,
     zoom,
     nodes: state.nodes.map(n => ({
       id: n.id, kind: n.kind, title: n.title,
@@ -3613,6 +3812,11 @@ function serialize() {
   }, null, 1);
 }
 function updateSaveStatus() {
+  if (readOnlyMode) {
+    saveStatusEl.textContent = '🔒 只读模式';
+    saveStatusEl.className = 'save-status warn';
+    return;
+  }
   if (!fileHandle) {
     saveStatusEl.textContent = supportsFS ? '未选择保存文件' : '当前浏览器不支持自动保存';
     saveStatusEl.className = 'save-status warn';
@@ -3627,6 +3831,7 @@ function updateSaveStatus() {
   }
 }
 function markDirty() {
+  if (readOnlyMode) return;
   fileDirty = true;
   updateSaveStatus();
   clearTimeout(autoSaveTimer);
@@ -3636,10 +3841,11 @@ function markDirty() {
   }, 800);
 }
 function backupLocal() {
+  if (readOnlyMode) return;
   try { localStorage.setItem('order-node-app', serialize()); } catch (e) {}
 }
 async function writeFile() {
-  if (!fileHandle) return;
+  if (!fileHandle || readOnlyMode) return;
   try {
     const w = await fileHandle.createWritable();
     await w.write(serialize());
@@ -3649,8 +3855,8 @@ async function writeFile() {
     updateSaveStatus();
   } catch (e) { toast('自动保存失败：' + (e.message || e)); }
 }
-
 document.getElementById('btnSaveFile').onclick = async () => {
+  if (guardReadOnly()) return;
   if (!supportsFS) { toast('浏览器不支持选择目录，已改为下载文件'); downloadJson(); return; }
   try {
     fileHandle = await window.showSaveFilePicker({
@@ -3662,10 +3868,12 @@ document.getElementById('btnSaveFile').onclick = async () => {
   } catch (e) { if (e.name !== 'AbortError') toast('未选择保存位置'); }
 };
 document.getElementById('btnSaveNow').onclick = () => {
+  if (guardReadOnly()) return;
   if (!fileHandle) return toast('请先点击「选择保存位置」');
   writeFile().then(() => toast('已保存'));
 };
 document.getElementById('btnOpenFile').onclick = async () => {
+  if (guardReadOnly()) return;
   if (supportsFS) {
     try {
       const [h] = await window.showOpenFilePicker({
@@ -3709,6 +3917,7 @@ function downloadJson() {
   downloadBlob(new Blob([serialize()], { type: 'application/json' }), 'order-nodes.json');
 }
 document.getElementById('btnClear').onclick = () => {
+  if (guardReadOnly()) return;
   if (!state.nodes.length) return;
   if (!confirm('确定清空所有节点？此操作不可撤销。')) return;
   state.nodes = []; state.edges = []; selectedIds.clear();
@@ -3719,6 +3928,7 @@ document.getElementById('btnClear').onclick = () => {
  *  新建起始节点
  * ========================================================================= */
 document.getElementById('btnRoot').onclick = () => {
+  if (guardReadOnly()) return;
   const count = state.nodes.filter(n => n.kind === 'root').length;
   const node = {
     id: uid('n'), kind: 'root',
@@ -3751,8 +3961,6 @@ async function init() {
   canvas.style.transform = 'scale(1)';
   updateZoomWrap();
   updateZoomDisplay();
-
-  // 先同步按钮显示状态
   updateAutoToggleBtn();
 
   // 1) 优先尝试从 URL hash 恢复（分享链接）
@@ -3760,6 +3968,7 @@ async function init() {
   if (fromHash) {
     setFreeMove(state.freeMove, true);
     updateAutoToggleBtn();
+    applyReadOnlyUI();
     updateSaveStatus();
     updateSelectionBar();
     window.addEventListener('resize', () => { drawEdges(); });
@@ -3779,9 +3988,7 @@ async function init() {
         }));
         state.edges = data.edges || [];
         state.freeMove = !!data.freeMove;
-        if (typeof data.autoLayoutOnToggle === 'boolean') {
-          autoLayoutOnToggle = data.autoLayoutOnToggle;
-        }
+        if (typeof data.autoLayoutOnToggle === 'boolean') autoLayoutOnToggle = data.autoLayoutOnToggle;
         restored = true;
         if (data.zoom && data.zoom !== 1) {
           zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, data.zoom));
@@ -3798,22 +4005,17 @@ async function init() {
     const root = {
       id: uid('n'), kind: 'root', title: '产品族',
       x: 120, y: 200, baseId: 'AB',
-      note: '', images: [], collapsed: false,
-      color: levelColorOf(0)
+      note: '', images: [], collapsed: false, color: levelColorOf(0)
     };
     const c1 = {
-      id: uid('n'), kind: 'rule', title: '子产品 A',
-      x: 490, y: 100,
+      id: uid('n'), kind: 'rule', title: '子产品 A', x: 490, y: 100,
       rules: [{ type: 'seq', value: 1, digits: 2, auto: true }],
-      note: '', images: [], collapsed: false,
-      color: levelColorOf(1)
+      note: '', images: [], collapsed: false, color: levelColorOf(1)
     };
     const c2 = {
-      id: uid('n'), kind: 'rule', title: '子产品 B',
-      x: 490, y: 360,
+      id: uid('n'), kind: 'rule', title: '子产品 B', x: 490, y: 360,
       rules: [{ type: 'seq', value: 1, digits: 2, auto: true }],
-      note: '', images: [], collapsed: false,
-      color: levelColorOf(1)
+      note: '', images: [], collapsed: false, color: levelColorOf(1)
     };
     state.nodes.push(root, c1, c2);
     state.edges.push(
@@ -3825,6 +4027,7 @@ async function init() {
   updateAutoToggleBtn();
   render();
   setFreeMove(state.freeMove, true);
+  applyReadOnlyUI();
   updateSaveStatus();
   updateSelectionBar();
 
