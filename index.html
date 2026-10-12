@@ -40,6 +40,10 @@
   .tbtn.free:hover{ border-color:#7ddc9a; background:#243521; }
   .tbtn.success{ border-color:#3fb96b; color:#a6efb8; background:rgba(63,185,107,.12); }
   .tbtn.success:hover{ border-color:#7ddc9a; background:rgba(63,185,107,.22); }
+  .tbtn.imp{ border-color:#8a6a2a; color:#ffce7a; background:rgba(224,166,58,.1); }
+  .tbtn.imp:hover{ border-color:var(--gold); background:rgba(224,166,58,.2); }
+  .tbtn.dash{ border-color:#7a4ab8; color:#c9a6f0; background:rgba(178,90,214,.1); }
+  .tbtn.dash:hover{ border-color:#b25ad6; background:rgba(178,90,214,.22); }
   .tbtn:disabled{ opacity:.45; cursor:not-allowed; }
   .spacer{ flex:1; }
 
@@ -96,6 +100,14 @@
   #edges .edge-hit{ fill:none; stroke:transparent; stroke-width:20; pointer-events:stroke; cursor:pointer; }
   #edges .edge-hit:hover + .edge{ stroke:var(--danger); stroke-width:3; }
   #edges .edge.temp{ stroke:var(--accent); stroke-dasharray:6 5; }
+
+  .selection-box{
+    position:absolute; pointer-events:none; z-index:200;
+    border:1.5px dashed var(--accent);
+    background:rgba(76,141,255,.13);
+    border-radius:3px;
+    box-shadow:0 0 0 1px rgba(76,141,255,.25) inset;
+  }
 
   /* ---------------- 节点 ---------------- */
   .node{
@@ -412,15 +424,17 @@
     width:min(720px,94vw); max-height:84vh; display:flex; flex-direction:column;
     box-shadow:0 24px 60px rgba(0,0,0,.7);
   }
+  .modal.wide{ width:min(880px,95vw); }
   .modal-head{
     padding:13px 18px; border-bottom:1px solid var(--border);
     display:flex; align-items:center; justify-content:space-between; font-weight:600;
   }
-  .modal-body{ padding:8px 18px 14px; overflow:auto; }
+  .modal-body{ padding:14px 18px; overflow:auto; }
   .modal-foot{
     padding:12px 18px; border-top:1px solid var(--border);
     display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap;
   }
+
   .export-table{ font-size:12.5px; }
   .et-row{
     display:grid; grid-template-columns:1fr 158px 54px 78px; gap:10px;
@@ -441,9 +455,202 @@
   .et-st.bad{ color:#ff8b8b; }
   .et-st.warn{ color:var(--muted); }
   .export-tip{
-    padding:9px 12px; margin:10px 0 4px;
+    padding:9px 12px; margin:0 0 10px;
     background:rgba(76,141,255,.08); border:1px solid rgba(76,141,255,.25);
     border-radius:8px; font-size:12px; color:#9dc2ff; line-height:1.6;
+  }
+
+  /* ---------------- 数据看板 ---------------- */
+  .dashboard-mask{
+    position:fixed; inset:0; z-index:350;
+    background:rgba(4,7,11,.82); backdrop-filter:blur(6px);
+    display:none; align-items:center; justify-content:center;
+  }
+  .dashboard-mask.show{ display:flex; }
+  .dashboard{
+    width:min(1400px, 97vw);
+    height:min(900px, 94vh);
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:16px;
+    box-shadow:0 30px 80px rgba(0,0,0,.8);
+    display:flex; flex-direction:column;
+    overflow:hidden;
+  }
+  .dashboard-head{
+    padding:14px 20px;
+    border-bottom:1px solid var(--border);
+    display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+    background:linear-gradient(180deg,#1b2230,#161b24);
+  }
+  .dashboard-head h3{
+    margin:0; font-size:16px; letter-spacing:.5px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .dashboard-head h3 span{ color:#c9a6f0; }
+  .dashboard-search{
+    flex:1; min-width:200px;
+    display:flex; align-items:center; gap:8px;
+    background:#0f141c; border:1px solid var(--border);
+    border-radius:9px; padding:4px 10px;
+  }
+  .dashboard-search:focus-within{ border-color:var(--accent); }
+  .dashboard-search input{
+    flex:1; background:transparent; border:none; outline:none;
+    color:var(--text); font-size:13px; font-family:inherit;
+    padding:5px 0;
+  }
+  .dashboard-search .cnt{
+    font-family:ui-monospace,monospace; font-size:12px; color:var(--muted);
+    white-space:nowrap;
+  }
+  .dashboard-close{
+    background:transparent; border:none; color:var(--muted);
+    width:32px; height:32px; border-radius:8px; cursor:pointer;
+    font-size:15px; display:grid; place-items:center;
+    font-family:inherit;
+  }
+  .dashboard-close:hover{ background:#2a3341; color:#fff; }
+
+  .dashboard-stats{
+    display:flex; gap:10px; padding:10px 20px;
+    background:#0f141c; border-bottom:1px solid var(--border);
+    flex-wrap:wrap;
+  }
+  .dstat{
+    display:flex; align-items:baseline; gap:6px;
+    padding:5px 12px; border-radius:8px;
+    background:#161b24; border:1px solid var(--border);
+    font-size:12px;
+  }
+  .dstat .dv{ font-family:ui-monospace,monospace; font-size:15px; font-weight:600; color:#fff; }
+  .dstat .dl{ color:var(--muted); }
+  .dstat.ok .dv{ color:var(--ok); }
+  .dstat.warn .dv{ color:var(--gold); }
+  .dstat.err .dv{ color:#ff8b8b; }
+  .dstat.acc .dv{ color:var(--accent); }
+
+  .dashboard-body{
+    flex:1; overflow:auto;
+    padding: 0;
+  }
+  .dashboard-body::-webkit-scrollbar{ width:12px; height:12px; }
+  .dashboard-body::-webkit-scrollbar-thumb{ background:#2a3341; border-radius:6px; }
+
+  .dash-table{
+    width:100%; border-collapse:collapse;
+    font-size:13px;
+  }
+  .dash-table thead th{
+    position:sticky; top:0; z-index:2;
+    background:#1b2230;
+    color:var(--muted); font-weight:600; font-size:12px;
+    text-align:left; padding:10px 12px;
+    border-bottom:1px solid var(--border);
+    white-space:nowrap;
+    user-select:none;
+  }
+  .dash-table tbody tr{
+    cursor:pointer;
+    transition:.1s;
+    border-bottom:1px solid #1a212e;
+  }
+  .dash-table tbody tr:hover{ background:rgba(76,141,255,.08); }
+  .dash-table tbody td{
+    padding:9px 12px;
+    vertical-align:middle;
+    color:var(--text);
+  }
+  .dash-table .col-lv{
+    width:60px; text-align:center;
+    font-family:ui-monospace,monospace;
+    color:var(--muted); font-size:12px;
+  }
+  .dash-table .col-lv-badge{
+    display:inline-block; min-width:24px;
+    padding:2px 8px; border-radius:5px;
+    background:#1c2330; border:1px solid var(--border);
+    color:#c9a6f0; font-size:11px;
+  }
+  .dash-table .col-name{ font-weight:600; }
+  .dash-table .col-id{
+    font-family:ui-monospace,monospace;
+    color:var(--gold); font-size:12.5px;
+    word-break:break-all;
+  }
+  .dash-table .col-id.bad{ color:#ff8b8b; }
+  .dash-table .col-id.unlinked{ color:#5d6878; font-style:italic; font-family:inherit; }
+  .dash-table .col-parent{ color:var(--muted); font-size:12.5px; }
+  .dash-table .col-note{
+    color:#a9b8cf; font-size:12px;
+    max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .dash-table .col-img{ text-align:center; color:var(--muted); font-size:12px; }
+  .dash-table .col-st{
+    text-align:center; font-size:11.5px;
+    white-space:nowrap;
+  }
+  .dash-table .col-st.ok{ color:#7ddc9a; }
+  .dash-table .col-st.bad{ color:#ff8b8b; }
+  .dash-table .col-st.warn{ color:var(--gold); }
+  .dash-table .lv-dot{
+    display:inline-block; width:10px; height:10px; border-radius:50%;
+    margin-right:8px; vertical-align:middle;
+    border:1px solid rgba(255,255,255,.15);
+  }
+  .dash-empty{
+    text-align:center; padding:60px 20px;
+    color:var(--muted); font-size:13px;
+  }
+
+  .dashboard-foot{
+    padding:12px 20px;
+    border-top:1px solid var(--border);
+    display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+    background:#141920;
+  }
+  .dashboard-foot .spacer{ flex:1; }
+
+  /* ---------------- 局域网分享 ---------------- */
+  .share-url-box{
+    display:flex; gap:8px;
+    background:#0f141c; border:1px solid var(--border);
+    border-radius:8px; padding:8px;
+  }
+  .share-url-box textarea{
+    flex:1; min-height:80px;
+    background:transparent; border:none; outline:none;
+    color:var(--gold); font-size:11.5px;
+    font-family:ui-monospace,monospace;
+    resize:vertical; line-height:1.5;
+    word-break:break-all;
+  }
+  .share-url-box textarea::-webkit-scrollbar{ width:8px; }
+  .share-url-box textarea::-webkit-scrollbar-thumb{ background:#2a3341; border-radius:4px; }
+
+  .share-hint{
+    padding:10px 12px; border-radius:8px;
+    font-size:12px; line-height:1.7;
+    margin-bottom:12px;
+  }
+  .share-hint.info{
+    background:rgba(76,141,255,.08);
+    border:1px solid rgba(76,141,255,.25);
+    color:#9dc2ff;
+  }
+  .share-hint.warn{
+    background:rgba(255,183,77,.08);
+    border:1px solid rgba(255,183,77,.3);
+    color:#ffce7a;
+  }
+  .share-hint code{
+    background:#1c2330; padding:1px 6px; border-radius:4px;
+    color:var(--gold); font-family:ui-monospace,monospace;
+    font-size:11.5px;
+  }
+  .share-section-title{
+    font-size:12px; color:var(--muted);
+    margin:14px 0 6px; letter-spacing:.5px;
   }
 
   .toast{
@@ -466,8 +673,12 @@
     <button class="tbtn hl caret" id="btnLayoutMenu" title="选择其他排版方式">▾</button>
   </div>
 
+  <button class="tbtn success" id="btnAutoToggle" title="折叠或展开节点后是否自动重新排版">📐 自动排版 · 开</button>
   <button class="tbtn" id="btnMoveMode" title="拖拽模式：防重叠 / 自由移动">🔒 防重叠</button>
-  <button class="tbtn success" id="btnExport">📊 导出 Excel</button>
+  <button class="tbtn" id="btnLevelColor" title="按层级自动配色，同级同色">🎨 层级配色</button>
+  <button class="tbtn dash" id="btnDashboard" title="以表格形式查看全部数据">📊 数据看板</button>
+  <button class="tbtn success" id="btnExport">📈 导出 Excel</button>
+  <button class="tbtn imp" id="btnImport">📥 CSV 导入</button>
 
   <div class="search-box">
     <input type="text" id="searchInput" placeholder="搜索 名称/订货号/备注" />
@@ -497,8 +708,8 @@
 <div class="selection-bar" id="selectionBar">
   <span class="sel-count">已选 <b id="selCount">0</b> 项</span>
   <button class="tbtn xs" id="selColor" title="为选中节点批量设置颜色">🎨 改色</button>
-  <button class="tbtn xs" id="selCollapse" title="折叠选中节点">▸ 折叠</button>
-  <button class="tbtn xs" id="selExpand" title="展开选中节点">▾ 展开</button>
+  <button class="tbtn xs" id="selCollapse" title="折叠选中节点（会触发自动排版）">▸ 折叠</button>
+  <button class="tbtn xs" id="selExpand" title="展开选中节点（会触发自动排版）">▾ 展开</button>
   <button class="tbtn xs danger" id="selDelete" title="删除选中节点及其子节点">🗑 删除</button>
   <button class="tbtn xs" id="selClear" title="取消选择 (Esc)">✕</button>
 </div>
@@ -527,6 +738,77 @@
       <button class="tbtn" id="modalDlCsv" style="display:none">⬇ CSV</button>
       <button class="tbtn" id="modalCopy">复制全部</button>
       <button class="tbtn" id="modalOk">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 导入弹窗 -->
+<div class="modal-mask" id="importMask">
+  <div class="modal wide">
+    <div class="modal-head">
+      <span>📥 CSV 批量导入</span>
+      <button class="icon-btn" id="importClose">✕</button>
+    </div>
+    <div class="modal-body" id="importBody"></div>
+    <div class="modal-foot">
+      <button class="tbtn" id="importTemplate">⬇ 下载模板</button>
+      <div class="spacer"></div>
+      <button class="tbtn danger" id="importClearFile" style="display:none">重新选择</button>
+      <button class="tbtn success" id="importRun" disabled>开始导入</button>
+      <button class="tbtn" id="importCancel">取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- 局域网分享弹窗 -->
+<div class="modal-mask" id="shareMask">
+  <div class="modal">
+    <div class="modal-head">
+      <span>🔗 局域网分享数据看板</span>
+      <button class="icon-btn" id="shareClose">✕</button>
+    </div>
+    <div class="modal-body" id="shareBody"></div>
+    <div class="modal-foot">
+      <button class="tbtn" id="shareOk">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 数据看板 -->
+<div class="dashboard-mask" id="dashboardMask">
+  <div class="dashboard">
+    <div class="dashboard-head">
+      <h3>📊 数据<span>看板</span></h3>
+      <div class="dashboard-search">
+        <input type="text" id="dashSearchInput" placeholder="搜索 名称 / 订货号 / 备注 / 父节点…" />
+        <span class="cnt" id="dashCount"></span>
+      </div>
+      <button class="dashboard-close" id="dashClose" title="关闭 (Esc)">✕</button>
+    </div>
+    <div class="dashboard-stats" id="dashStats"></div>
+    <div class="dashboard-body">
+      <table class="dash-table">
+        <thead>
+          <tr>
+            <th style="width:60px">层级</th>
+            <th style="width:180px">名称</th>
+            <th style="width:220px">订货号</th>
+            <th style="width:160px">父节点</th>
+            <th>备注</th>
+            <th style="width:60px;text-align:center">截图</th>
+            <th style="width:90px;text-align:center">状态</th>
+          </tr>
+        </thead>
+        <tbody id="dashTbody"></tbody>
+      </table>
+      <div class="dash-empty" id="dashEmpty" style="display:none"></div>
+    </div>
+    <div class="dashboard-foot">
+      <button class="tbtn" id="dashLevelColor" title="按层级给画布节点配色">🎨 应用层级配色</button>
+      <button class="tbtn" id="dashFit" title="适应全部节点">🎯 定位全部</button>
+      <span class="spacer"></span>
+      <button class="tbtn success" id="dashExportXlsx">📈 导出 Excel</button>
+      <button class="tbtn dash" id="dashShare">🔗 局域网分享</button>
     </div>
   </div>
 </div>
@@ -604,10 +886,57 @@ const state = { nodes: [], edges: [], freeMove: false };
 let visibleSet = new Set();
 const selectedIds = new Set();
 
+// ★ 折叠/展开后自动排版开关
+let autoLayoutOnToggle = true;
+
 const getNode  = id => state.nodes.find(n => n.id === id);
 const parentOf = id => {
   const e = state.edges.find(e => e.to === id);
   return e ? getNode(e.from) : null;
+};
+
+/* =========================================================================
+ *  层级配色
+ * ========================================================================= */
+const LEVEL_COLORS = [
+  '#4c8dff', '#3fb96b', '#e0a63a', '#e05252', '#b25ad6',
+  '#2fa8a0', '#e2703a', '#8bc34a', '#4a7ac8', '#7a869a'
+];
+function levelColorOf(depth) {
+  return LEVEL_COLORS[((depth % LEVEL_COLORS.length) + LEVEL_COLORS.length) % LEVEL_COLORS.length];
+}
+function applyLevelColorsToAll(silent) {
+  const depthMap = computeNodeDepth();
+  state.nodes.forEach(n => {
+    const d = depthMap.get(n.id) ?? 0;
+    n.color = levelColorOf(d);
+  });
+  render();
+  markDirty();
+  if (!silent) toast('已按层级自动配色 · 同级同色');
+}
+document.getElementById('btnLevelColor').onclick = () => applyLevelColorsToAll(false);
+
+/* =========================================================================
+ *  自动排版开关
+ * ========================================================================= */
+const btnAutoToggle = document.getElementById('btnAutoToggle');
+function updateAutoToggleBtn() {
+  if (autoLayoutOnToggle) {
+    btnAutoToggle.textContent = '📐 自动排版 · 开';
+    btnAutoToggle.classList.add('success');
+    btnAutoToggle.title = '已开启：折叠或展开节点后自动重新排版（点击关闭）';
+  } else {
+    btnAutoToggle.textContent = '📐 自动排版 · 关';
+    btnAutoToggle.classList.remove('success');
+    btnAutoToggle.title = '已关闭：折叠或展开后保持节点位置（点击开启）';
+  }
+}
+btnAutoToggle.onclick = () => {
+  autoLayoutOnToggle = !autoLayoutOnToggle;
+  updateAutoToggleBtn();
+  toast(autoLayoutOnToggle ? '折叠/展开后将自动重新排版' : '已关闭自动排版');
+  markDirty();
 };
 
 /* =========================================================================
@@ -629,7 +958,6 @@ function updateZoomDisplay() {
 function applyZoom(newZoom, anchorClientX, anchorClientY) {
   newZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, newZoom));
   if (Math.abs(newZoom - zoom) < 0.001) return;
-
   const stageRect = stage.getBoundingClientRect();
   let anchorX, anchorY;
   if (anchorClientX != null && anchorClientY != null) {
@@ -642,11 +970,9 @@ function applyZoom(newZoom, anchorClientX, anchorClientY) {
   const ratio = newZoom / zoom;
   const newAnchorX = anchorX * ratio;
   const newAnchorY = anchorY * ratio;
-
   zoom = newZoom;
   canvas.style.transform = `scale(${zoom})`;
   updateZoomWrap();
-
   if (anchorClientX != null && anchorClientY != null) {
     stage.scrollLeft = newAnchorX - (anchorClientX - stageRect.left);
     stage.scrollTop  = newAnchorY - (anchorClientY - stageRect.top);
@@ -664,7 +990,6 @@ function setCanvasSize(w, h) {
   updateZoomWrap();
 }
 
-// Ctrl + 滚轮缩放
 stage.addEventListener('wheel', e => {
   if (!e.ctrlKey && !e.metaKey) return;
   e.preventDefault();
@@ -688,7 +1013,6 @@ document.getElementById('zoomFit').onclick = () => {
   const zy = stage.clientHeight / fitH;
   const nz = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.min(zx, zy)));
   applyZoom(nz);
-  // 滚动到内容左上角
   setTimeout(() => {
     stage.scrollLeft = (minX - pad) * zoom;
     stage.scrollTop  = (minY - pad) * zoom;
@@ -1112,6 +1436,27 @@ function buildRuleEl(node, rule) {
 }
 
 /* =========================================================================
+ *  折叠/展开（含自动排版）
+ * ========================================================================= */
+function toggleCollapseNode(node) {
+  node.collapsed = !node.collapsed;
+  render();
+  markDirty();
+
+  // ★ 折叠/展开后自动排版（若开启）
+  if (autoLayoutOnToggle && state.nodes.length > 1) {
+    // 使用 requestAnimationFrame 让浏览器先完成当前渲染
+    requestAnimationFrame(() => {
+      autoLayout('vertical', {
+        forceFreeMove: false,   // 不改变用户当前的拖拽模式
+        toastMsg: false,        // 不弹提示，避免打扰
+        scrollToStart: false    // 不跳回左上角，保持用户当前视野
+      });
+    });
+  }
+}
+
+/* =========================================================================
  *  节点渲染
  * ========================================================================= */
 let activeNodeId = null;
@@ -1135,7 +1480,10 @@ function buildNodeEl(node) {
 
   const chev = el('button', 'icon-btn chev', node.collapsed ? '▸' : '▾');
   chev.title = '折叠 / 展开（连同子节点）';
-  chev.onclick = ev => { ev.stopPropagation(); node.collapsed = !node.collapsed; render(); markDirty(); };
+  chev.onclick = ev => {
+    ev.stopPropagation();
+    toggleCollapseNode(node);  // ★ 使用封装函数
+  };
 
   const title = el('input', 'node-title');
   title.value = node.title;
@@ -1180,7 +1528,6 @@ function buildNodeEl(node) {
     navigator.clipboard?.writeText(v).then(() => toast('已复制：' + v), () => toast(v));
   };
   idrow.append(idcode, copyBtn);
-  // ★ 悬停显示完整路径
   idrow.addEventListener('mouseenter', e => showPathTooltip(node, e));
   idrow.addEventListener('mousemove', movePathTooltip);
   idrow.addEventListener('mouseleave', hidePathTooltip);
@@ -1256,6 +1603,7 @@ function render() {
   applySearchHighlight();
   updateSearchCount();
   applySelectionVisual();
+  if (dashboardOpen) renderDashboardTable();
 }
 
 /* =========================================================================
@@ -1351,6 +1699,11 @@ document.getElementById('selCollapse').onclick = () => {
   if (!selected.length) return;
   selected.forEach(n => n.collapsed = true);
   render(); markDirty();
+  if (autoLayoutOnToggle && state.nodes.length > 1) {
+    requestAnimationFrame(() => {
+      autoLayout('vertical', { forceFreeMove: false, toastMsg: false, scrollToStart: false });
+    });
+  }
   toast(`已折叠 ${selected.length} 个节点`);
 };
 document.getElementById('selExpand').onclick = () => {
@@ -1358,8 +1711,68 @@ document.getElementById('selExpand').onclick = () => {
   if (!selected.length) return;
   selected.forEach(n => n.collapsed = false);
   render(); markDirty();
+  if (autoLayoutOnToggle && state.nodes.length > 1) {
+    requestAnimationFrame(() => {
+      autoLayout('vertical', { forceFreeMove: false, toastMsg: false, scrollToStart: false });
+    });
+  }
   toast(`已展开 ${selected.length} 个节点`);
 };
+
+/* =========================================================================
+ *  框选
+ * ========================================================================= */
+function startBoxSelect(e) {
+  e.preventDefault();
+  const start = toCanvas(e.clientX, e.clientY);
+
+  const box = document.createElement('div');
+  box.className = 'selection-box';
+  box.style.left = start.x + 'px';
+  box.style.top  = start.y + 'px';
+  box.style.width = '0px';
+  box.style.height = '0px';
+  canvas.appendChild(box);
+
+  if (!e.shiftKey && selectedIds.size > 0) {
+    selectedIds.clear();
+    applySelectionVisual();
+    updateSelectionBar();
+  }
+  const baseSelected = new Set(selectedIds);
+
+  const move = ev => {
+    const cur = toCanvas(ev.clientX, ev.clientY);
+    const x = Math.min(start.x, cur.x);
+    const y = Math.min(start.y, cur.y);
+    const w = Math.abs(cur.x - start.x);
+    const h = Math.abs(cur.y - start.y);
+    box.style.left = x + 'px';
+    box.style.top  = y + 'px';
+    box.style.width  = w + 'px';
+    box.style.height = h + 'px';
+
+    selectedIds.clear();
+    baseSelected.forEach(id => selectedIds.add(id));
+    for (const n of state.nodes) {
+      if (!visibleSet.has(n.id)) continue;
+      const rx = n.x, ry = n.y;
+      const rw = n._w || NODE_W, rh = n._h || DEF_H;
+      if (rx + rw >= x && rx <= x + w && ry + rh >= y && ry <= y + h) {
+        selectedIds.add(n.id);
+      }
+    }
+    applySelectionVisual();
+    updateSelectionBar();
+  };
+  const up = () => {
+    document.removeEventListener('pointermove', move);
+    document.removeEventListener('pointerup', up);
+    box.remove();
+  };
+  document.addEventListener('pointermove', move);
+  document.addEventListener('pointerup', up);
+}
 
 /* =========================================================================
  *  悬停显示完整路径
@@ -1426,11 +1839,14 @@ function hidePathTooltip() {
  *  增删改
  * ========================================================================= */
 function addChild(parent) {
+  const pDepth = computeNodeDepth().get(parent.id) ?? 0;
+  const newDepth = pDepth + 1;
   const node = {
     id: uid('n'), kind: 'rule', title: '子产品',
     x: parent.x + 340, y: parent.y,
     rules: [{ type: 'seq', value: 1, digits: 2, auto: true }],
-    note: '', images: [], collapsed: false, color: null
+    note: '', images: [], collapsed: false,
+    color: levelColorOf(newDepth)
   };
   state.nodes.push(node);
   state.edges.push({ id: uid('e'), from: parent.id, to: node.id });
@@ -1486,7 +1902,7 @@ function connect(fromId, toId) {
 }
 
 /* =========================================================================
- *  交互：拖拽 / 连线
+ *  交互：拖拽 / 连线 / 框选
  * ========================================================================= */
 canvas.addEventListener('pointerdown', e => {
   hidePathTooltip();
@@ -1499,7 +1915,6 @@ canvas.addEventListener('pointerdown', e => {
   if (inPort) { unlink(e, inPort.closest('.node').dataset.id); return; }
   if (e.target.closest('input, select, button, textarea, label, .port')) return;
 
-  // Ctrl / Cmd + 点击：切换选择
   if (nodeEl && (e.ctrlKey || e.metaKey)) {
     e.preventDefault();
     toggleSelectNode(nodeEl);
@@ -1514,8 +1929,7 @@ canvas.addEventListener('pointerdown', e => {
     return;
   }
 
-  // 点击空白画布：清除选择
-  if (selectedIds.size > 0) clearSelection();
+  startBoxSelect(e);
 });
 
 function startDrag(e, nodeEl) {
@@ -1529,7 +1943,6 @@ function startDrag(e, nodeEl) {
 
   const move = ev => {
     moved = true;
-    // ★ 除以缩放
     const dx = (ev.clientX - sx) / zoom;
     const dy = (ev.clientY - sy) / zoom;
     const nx = Math.max(0, ox + dx);
@@ -1599,10 +2012,15 @@ function unlink(e, toId) {
   }
 }
 
-/* 快捷键：Ctrl+A 全选，Esc 取消选择 */
 document.addEventListener('keydown', e => {
   if (ivState.open) return;
   if (modalMask.classList.contains('show')) return;
+  if (importMask.classList.contains('show')) return;
+  if (shareMask.classList.contains('show')) return;
+  if (dashboardOpen) {
+    if (e.key === 'Escape') { e.preventDefault(); closeDashboard(); return; }
+    return;
+  }
 
   const tag = (document.activeElement?.tagName || '').toLowerCase();
   const editing = tag === 'input' || tag === 'textarea' || tag === 'select';
@@ -1719,8 +2137,26 @@ function layoutVertical() {
   }
 }
 
-function autoLayout(mode = 'vertical') {
-  if (!state.nodes.length) return toast('没有节点可排版');
+/**
+ * 一键排版
+ * @param {string} mode  'vertical'（默认）或 'tree'
+ * @param {object} opts
+ *   - forceFreeMove: 是否强制开启自由移动（手动触发时为 true）
+ *   - toastMsg:      是否弹提示
+ *   - scrollToStart: 是否滚动到左上角
+ */
+function autoLayout(mode = 'vertical', opts = {}) {
+  const {
+    forceFreeMove = true,
+    toastMsg = true,
+    scrollToStart = true
+  } = opts;
+
+  if (!state.nodes.length) {
+    if (toastMsg) toast('没有节点可排版');
+    return;
+  }
+
   visibleSet = computeVisible();
   measureNodeHeights();
   if (mode === 'tree') layoutTree();
@@ -1728,11 +2164,18 @@ function autoLayout(mode = 'vertical') {
   fitCanvasSize();
   render();
   markDirty();
-  setFreeMove(true, true);
-  stage.scrollTo({ left: 0, top: 0, behavior: 'smooth' });
-  toast(mode === 'tree'
-    ? '已按「横向树形」排列 · 现在可随意拖动节点'
-    : '已按「往右竖向」排列 · 现在可随意拖动节点');
+
+  if (forceFreeMove) setFreeMove(true, true);
+
+  if (scrollToStart) {
+    stage.scrollTo({ left: 0, top: 0, behavior: 'smooth' });
+  }
+
+  if (toastMsg) {
+    toast(mode === 'tree'
+      ? '已按「横向树形」排列 · 现在可随意拖动节点'
+      : '已按「往右竖向」排列 · 现在可随意拖动节点');
+  }
 }
 
 let layoutMenuEl = null, layoutMenuOutside = null;
@@ -1765,7 +2208,7 @@ function openLayoutMenu(anchorBtn) {
 
   const tip = el('button');
   tip.style.cursor = 'default'; tip.style.opacity = '.72';
-  tip.appendChild(el('small', null, '排版后自动开启「自由移动」，节点可随意拖动'));
+  tip.appendChild(el('small', null, '提示：折叠/展开节点后也会自动排版（可在顶栏切换）'));
   tip.onclick = ev => ev.stopPropagation();
   m.appendChild(tip);
 
@@ -1932,7 +2375,7 @@ document.addEventListener('keydown', e => {
 });
 
 /* =========================================================================
- *  搜索
+ *  搜索（画布）
  * ========================================================================= */
 let searchQuery = '';
 let searchHits = [];
@@ -2178,7 +2621,7 @@ function todayStamp() {
 }
 
 /* =========================================================================
- *  导出
+ *  导出数据收集
  * ========================================================================= */
 function collectExportData() {
   const conflicts = checkDuplicates();
@@ -2199,77 +2642,23 @@ function collectExportData() {
       parentName: p ? (p.title || '') : '—',
       note: n.note || '',
       status,
+      imageCount: (n.images || []).length,
       isLeaf: !state.edges.some(e => e.from === n.id),
       isRoot: n.kind === 'root'
     };
   }).sort((a, b) => (a.depth - b.depth) || (a.node.y - b.node.y) || (a.node.x - b.node.x));
 }
 
-document.getElementById('btnExport').onclick = () => {
-  if (!state.nodes.length) return toast('还没有任何节点');
+function buildSheetRows() {
   const rows = collectExportData();
-  const leafCount = rows.filter(r => r.isLeaf).length;
-
-  const headHtml = `
-    <div class="et-row head">
-      <span>订货号</span><span>产品名称</span>
-      <span class="et-lv">层级</span><span class="et-st">状态</span>
-    </div>`;
-  const bodyHtml = rows.map(r => {
-    const idCls = r.status === '同级重复' ? ' bad'
-                : r.status === '未连接'   ? ' unlinked' : '';
-    const stCls = r.status === '正常'    ? 'ok'
-                : r.status === '同级重复' ? 'bad' : 'warn';
-    return `<div class="et-row">
-      <span class="et-id${idCls}">${escapeHtml(r.id)}</span>
-      <span class="et-name" title="${escapeHtml(r.name)}">${escapeHtml(r.name)}</span>
-      <span class="et-lv">${r.depth}</span>
-      <span class="et-st ${stCls}">${escapeHtml(r.status)}</span>
-    </div>`;
-  }).join('');
-
-  const previewHtml = `
-    <div class="export-tip">
-      共 <b>${rows.length}</b> 个节点，其中成品（叶子）<b>${leafCount}</b> 个。
-      默认导出为 <b>Excel (.xlsx)</b>，包含：订货号、产品名称、层级、父节点、备注、状态、是否成品。
-    </div>
-    <div class="export-table">${headHtml}${bodyHtml}</div>`;
-
-  const rawText = rows.map(r => `${r.id}\t${r.name}`).join('\n');
-
-  openModal(`导出订货号（${rows.length} 个节点）`, previewHtml, rawText, {
-    showCopy: true, showDownload: true,
-    onXlsx: () => {
-      try {
-        const sheetRows = [
-          ['订货号', '产品名称', '层级', '父节点', '备注', '状态', '是否成品'],
-          ...rows.map(r => [r.id, r.name, String(r.depth), r.parentName, r.note, r.status, r.isLeaf ? '是' : ''])
-        ];
-        const colWidths = [30, 24, 8, 24, 40, 12, 10];
-        downloadBlob(buildXlsxBlob(sheetRows, colWidths), `订货号_${todayStamp()}.xlsx`);
-        toast('已生成 Excel 文件');
-      } catch (err) {
-        console.error(err); toast('生成 Excel 失败：' + (err.message || err));
-      }
-    },
-    onCsv: () => {
-      const esc = v => {
-        const s = String(v == null ? '' : v);
-        return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
-      };
-      const csvRows = [
-        ['订货号', '产品名称', '层级', '父节点', '备注', '状态', '是否成品'],
-        ...rows.map(r => [r.id, r.name, r.depth, r.parentName, r.note, r.status, r.isLeaf ? '是' : ''])
-      ];
-      const csv = '\uFEFF' + csvRows.map(r => r.map(esc).join(',')).join('\r\n');
-      downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), `订货号_${todayStamp()}.csv`);
-      toast('已生成 CSV 文件');
-    }
-  });
-};
+  return [
+    ['订货号', '产品名称', '层级', '父节点', '备注', '截图数', '状态', '是否成品'],
+    ...rows.map(r => [r.id, r.name, String(r.depth), r.parentName, r.note, String(r.imageCount), r.status, r.isLeaf ? '是' : ''])
+  ];
+}
 
 /* =========================================================================
- *  通用弹窗
+ *  导出弹窗
  * ========================================================================= */
 const modalMask  = document.getElementById('modalMask');
 const modalBody  = document.getElementById('modalBody');
@@ -2302,6 +2691,901 @@ modalCopy.onclick = () => {
     () => toast('已复制到剪贴板'), () => toast('复制失败'));
 };
 
+document.getElementById('btnExport').onclick = () => {
+  if (!state.nodes.length) return toast('还没有任何节点');
+  const rows = collectExportData();
+  const leafCount = rows.filter(r => r.isLeaf).length;
+
+  const headHtml = `
+    <div class="et-row head">
+      <span>订货号</span><span>产品名称</span>
+      <span class="et-lv">层级</span><span class="et-st">状态</span>
+    </div>`;
+  const bodyHtml = rows.map(r => {
+    const idCls = r.status === '同级重复' ? ' bad'
+                : r.status === '未连接'   ? ' unlinked' : '';
+    const stCls = r.status === '正常'    ? 'ok'
+                : r.status === '同级重复' ? 'bad' : 'warn';
+    return `<div class="et-row">
+      <span class="et-id${idCls}">${escapeHtml(r.id)}</span>
+      <span class="et-name" title="${escapeHtml(r.name)}">${escapeHtml(r.name)}</span>
+      <span class="et-lv">${r.depth}</span>
+      <span class="et-st ${stCls}">${escapeHtml(r.status)}</span>
+    </div>`;
+  }).join('');
+
+  const previewHtml = `
+    <div class="export-tip">
+      共 <b>${rows.length}</b> 个节点，其中成品（叶子）<b>${leafCount}</b> 个。
+      默认导出为 <b>Excel (.xlsx)</b>。
+    </div>
+    <div class="export-table">${headHtml}${bodyHtml}</div>`;
+
+  const rawText = rows.map(r => `${r.id}\t${r.name}`).join('\n');
+
+  openModal(`导出订货号（${rows.length} 个节点）`, previewHtml, rawText, {
+    showCopy: true, showDownload: true,
+    onXlsx: () => {
+      try {
+        const sheetRows = buildSheetRows();
+        const colWidths = [30, 24, 8, 24, 40, 8, 12, 10];
+        downloadBlob(buildXlsxBlob(sheetRows, colWidths), `订货号_${todayStamp()}.xlsx`);
+        toast('已生成 Excel 文件');
+      } catch (err) {
+        console.error(err); toast('生成 Excel 失败：' + (err.message || err));
+      }
+    },
+    onCsv: () => {
+      const esc = v => {
+        const s = String(v == null ? '' : v);
+        return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+      };
+      const csvRows = buildSheetRows();
+      const csv = '\uFEFF' + csvRows.map(r => r.map(esc).join(',')).join('\r\n');
+      downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), `订货号_${todayStamp()}.csv`);
+      toast('已生成 CSV 文件');
+    }
+  });
+};
+
+/* =========================================================================
+ *  数据看板
+ * ========================================================================= */
+const dashboardMask = document.getElementById('dashboardMask');
+let dashboardOpen = false;
+let dashSearchQuery = '';
+
+function openDashboard() {
+  dashboardOpen = true;
+  dashboardMask.classList.add('show');
+  dashSearchQuery = '';
+  const inp = document.getElementById('dashSearchInput');
+  if (inp) { inp.value = ''; }
+  renderDashboardStats();
+  renderDashboardTable();
+  setTimeout(() => inp?.focus(), 80);
+}
+function closeDashboard() {
+  dashboardOpen = false;
+  dashboardMask.classList.remove('show');
+}
+document.getElementById('btnDashboard').onclick = openDashboard;
+document.getElementById('dashClose').onclick = closeDashboard;
+dashboardMask.addEventListener('click', e => {
+  if (e.target === dashboardMask) closeDashboard();
+});
+
+const dashSearchInputEl = document.getElementById('dashSearchInput');
+dashSearchInputEl?.addEventListener('input', () => {
+  dashSearchQuery = dashSearchInputEl.value.trim().toLowerCase();
+  renderDashboardTable();
+});
+dashSearchInputEl?.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { e.stopPropagation(); closeDashboard(); }
+});
+
+function renderDashboardStats() {
+  const el = document.getElementById('dashStats');
+  if (!el) return;
+  const rows = collectExportData();
+  const conflicts = checkDuplicates();
+  const roots = rows.filter(r => r.isRoot).length;
+  const leaves = rows.filter(r => r.isLeaf).length;
+  const dup = conflicts.size;
+  const unlinked = rows.filter(r => r.status === '未连接').length;
+  const maxDepth = rows.length ? Math.max(...rows.map(r => r.depth)) : 0;
+  const imgTotal = rows.reduce((s, r) => s + r.imageCount, 0);
+
+  el.innerHTML = `
+    <div class="dstat"><span class="dv">${rows.length}</span><span class="dl">总节点</span></div>
+    <div class="dstat acc"><span class="dv">${roots}</span><span class="dl">起始族</span></div>
+    <div class="dstat ok"><span class="dv">${leaves}</span><span class="dl">成品</span></div>
+    <div class="dstat"><span class="dv">${maxDepth + 1}</span><span class="dl">层级数</span></div>
+    ${dup ? `<div class="dstat err"><span class="dv">${dup}</span><span class="dl">同级重复</span></div>` : ''}
+    ${unlinked ? `<div class="dstat warn"><span class="dv">${unlinked}</span><span class="dl">未连接</span></div>` : ''}
+    <div class="dstat"><span class="dv">${imgTotal}</span><span class="dl">截图</span></div>
+  `;
+}
+
+function renderDashboardTable() {
+  if (!dashboardOpen) return;
+  const tbody = document.getElementById('dashTbody');
+  const emptyEl = document.getElementById('dashEmpty');
+  const cntEl = document.getElementById('dashCount');
+  if (!tbody) return;
+
+  const allRows = collectExportData();
+  let filtered = allRows;
+  if (dashSearchQuery) {
+    filtered = allRows.filter(r => {
+      const hay = [r.name, r.id, r.note, r.parentName, r.status].join(' ').toLowerCase();
+      return hay.includes(dashSearchQuery);
+    });
+  }
+
+  if (cntEl) {
+    cntEl.textContent = dashSearchQuery
+      ? `${filtered.length} / ${allRows.length}`
+      : `${allRows.length}`;
+  }
+
+  if (!filtered.length) {
+    tbody.innerHTML = '';
+    emptyEl.style.display = '';
+    emptyEl.textContent = allRows.length
+      ? `没有匹配「${dashSearchQuery}」的结果`
+      : '还没有任何节点，请先在画布上创建。';
+    return;
+  }
+  emptyEl.style.display = 'none';
+
+  tbody.innerHTML = filtered.map(r => {
+    const idCls = r.status === '同级重复' ? ' bad'
+                : r.status === '未连接'   ? ' unlinked' : '';
+    const stCls = r.status === '正常'    ? 'ok'
+                : r.status === '同级重复' ? 'bad'
+                : r.status === '未连接'   ? 'warn' : 'warn';
+    const lvColor = levelColorOf(r.depth);
+    return `<tr data-node-id="${escapeHtml(r.node.id)}">
+      <td class="col-lv"><span class="col-lv-badge">${r.depth}</span></td>
+      <td class="col-name"><span class="lv-dot" style="background:${lvColor}"></span>${escapeHtml(r.name)}</td>
+      <td class="col-id${idCls}">${escapeHtml(r.id)}</td>
+      <td class="col-parent">${escapeHtml(r.parentName)}</td>
+      <td class="col-note" title="${escapeHtml(r.note)}">${escapeHtml(r.note) || '<span style="color:#4d586b">—</span>'}</td>
+      <td class="col-img">${r.imageCount > 0 ? r.imageCount + ' 张' : '—'}</td>
+      <td class="col-st ${stCls}">${escapeHtml(r.status)}</td>
+    </tr>`;
+  }).join('');
+
+  tbody.querySelectorAll('tr[data-node-id]').forEach(tr => {
+    tr.onclick = () => {
+      const id = tr.dataset.nodeId;
+      closeDashboard();
+      setTimeout(() => {
+        let cur = parentOf(id), g = 0;
+        while (cur && g++ < 60) {
+          if (cur.collapsed) { cur.collapsed = false; }
+          cur = parentOf(cur.id);
+        }
+        render();
+        scrollToNode(id);
+      }, 80);
+    };
+  });
+}
+
+document.getElementById('dashLevelColor').onclick = () => {
+  applyLevelColorsToAll(false);
+  renderDashboardStats();
+  renderDashboardTable();
+};
+document.getElementById('dashFit').onclick = () => {
+  closeDashboard();
+  setTimeout(() => document.getElementById('zoomFit').click(), 80);
+};
+document.getElementById('dashExportXlsx').onclick = () => {
+  try {
+    const sheetRows = buildSheetRows();
+    const colWidths = [30, 24, 8, 24, 40, 8, 12, 10];
+    downloadBlob(buildXlsxBlob(sheetRows, colWidths), `订货号_${todayStamp()}.xlsx`);
+    toast('已导出 Excel');
+  } catch (err) {
+    toast('导出失败：' + (err.message || err));
+  }
+};
+document.getElementById('dashShare').onclick = () => openShareDialog();
+
+/* =========================================================================
+ *  局域网分享
+ * ========================================================================= */
+const shareMask = document.getElementById('shareMask');
+const shareBody = document.getElementById('shareBody');
+
+function bytesToBase64Url(bytes) {
+  let bin = '';
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+  }
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function base64UrlToBytes(s) {
+  s = s.replace(/-/g, '+').replace(/_/g, '/');
+  while (s.length % 4) s += '=';
+  const bin = atob(s);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+async function compressData(str) {
+  const bytes = new TextEncoder().encode(str);
+  if (typeof CompressionStream === 'undefined') {
+    return 'raw_' + bytesToBase64Url(bytes);
+  }
+  try {
+    const cs = new CompressionStream('gzip');
+    const writer = cs.writable.getWriter();
+    writer.write(bytes);
+    writer.close();
+    const chunks = [];
+    const reader = cs.readable.getReader();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+    }
+    let total = 0;
+    for (const c of chunks) total += c.length;
+    const out = new Uint8Array(total);
+    let o = 0;
+    for (const c of chunks) { out.set(c, o); o += c.length; }
+    return 'gz_' + bytesToBase64Url(out);
+  } catch (e) {
+    return 'raw_' + bytesToBase64Url(bytes);
+  }
+}
+async function decompressData(s) {
+  if (s.startsWith('raw_')) {
+    return new TextDecoder().decode(base64UrlToBytes(s.slice(4)));
+  }
+  if (s.startsWith('gz_')) {
+    const bytes = base64UrlToBytes(s.slice(3));
+    if (typeof DecompressionStream === 'undefined') {
+      throw new Error('当前浏览器不支持解压');
+    }
+    const ds = new DecompressionStream('gzip');
+    const writer = ds.writable.getWriter();
+    writer.write(bytes);
+    writer.close();
+    const chunks = [];
+    const reader = ds.readable.getReader();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+    }
+    let total = 0;
+    for (const c of chunks) total += c.length;
+    const out = new Uint8Array(total);
+    let o = 0;
+    for (const c of chunks) { out.set(c, o); o += c.length; }
+    return new TextDecoder().decode(out);
+  }
+  throw new Error('未知的编码格式');
+}
+
+function stripImagesForShare() {
+  return {
+    v: 9,
+    freeMove: state.freeMove,
+    autoLayoutOnToggle,
+    zoom,
+    nodes: state.nodes.map(n => ({
+      id: n.id, kind: n.kind, title: n.title,
+      x: n.x, y: n.y,
+      baseId: n.baseId, rules: n.rules,
+      note: n.note, images: [],
+      collapsed: n.collapsed, color: n.color || null
+    })),
+    edges: state.edges
+  };
+}
+
+async function openShareDialog() {
+  shareBody.innerHTML = '<div style="padding:30px;text-align:center;color:#8a97ab">正在生成分享链接…</div>';
+  shareMask.classList.add('show');
+
+  try {
+    const data = stripImagesForShare();
+    const json = JSON.stringify(data);
+    const encoded = await compressData(json);
+
+    const baseUrl = location.href.split('#')[0];
+    const shareUrl = `${baseUrl}#data=${encoded}`;
+    const urlSize = shareUrl.length;
+    const sizeStr = urlSize < 1024 ? urlSize + ' 字符'
+                  : (urlSize / 1024).toFixed(1) + ' K 字符';
+    const isLocal = location.protocol === 'file:';
+
+    let warnHtml = '';
+    if (urlSize > 60000) {
+      warnHtml = `<div class="share-hint warn">
+        ⚠ 链接较长（${sizeStr}），部分聊天软件可能会截断。
+        建议：<br>
+        1. 把链接保存为文本文件，通过 U 盘或共享文件夹发送<br>
+        2. 或者把本 HTML 文件整体放到局域网共享目录，让同事直接打开
+      </div>`;
+    }
+
+    let localHintHtml = '';
+    if (isLocal) {
+      localHintHtml = `<div class="share-hint info">
+        💡 <b>当前是本地文件模式</b>（<code>file://</code>），局域网内的同事无法直接访问您本机的文件路径。<br>
+        <b>推荐做法：</b><br>
+        1. 把本 HTML 文件放到局域网共享目录，或放到任意一台可以访问的电脑上<br>
+        2. 在该目录运行一个简单 HTTP 服务：<code>python -m http.server 8000</code><br>
+        3. 其他同事访问：<code>http://您的IP:8000/文件名.html#data=…</code>
+      </div>`;
+    } else {
+      localHintHtml = `<div class="share-hint info">
+        ✓ 当前页面已通过 HTTP 访问，可以把下面的链接直接发给同一局域网的同事。
+      </div>`;
+    }
+
+    const imgCount = state.nodes.reduce((s, n) => s + (n.images?.length || 0), 0);
+    const imgNote = imgCount > 0
+      ? `<div class="share-hint warn" style="margin-top:8px">⚠ 当前共 ${imgCount} 张截图，出于链接长度考虑，分享链接<b>不包含截图</b>。截图请通过其他方式单独传递。</div>`
+      : '';
+
+    shareBody.innerHTML = `
+      ${localHintHtml}
+      ${warnHtml}
+      ${imgNote}
+      <div class="share-section-title">分享链接（包含所有节点数据）</div>
+      <div class="share-url-box">
+        <textarea id="shareUrlText" readonly>${escapeHtml(shareUrl)}</textarea>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="tbtn success" id="shareCopyBtn">📋 复制链接</button>
+        <button class="tbtn" id="shareTestBtn">🔍 在新标签页打开测试</button>
+      </div>
+      <div class="share-section-title">使用步骤</div>
+      <div style="font-size:12.5px;line-height:1.9;color:var(--muted)">
+        1. 把本 HTML 文件放到局域网内其他电脑可以访问的位置（共享目录 / HTTP 服务）<br>
+        2. 点击上方「复制链接」<br>
+        3. 通过微信 / 钉钉 / 邮件把链接发给同事<br>
+        4. 同事在浏览器打开，即可看到完全一致的数据看板
+      </div>
+      <div class="share-section-title">链接大小</div>
+      <div style="font-size:12.5px;color:var(--muted)">
+        当前链接长度：<b style="color:var(--gold)">${sizeStr}</b>
+        ${urlSize > 60000 ? '（较长，建议用文件方式传递）' : ''}
+      </div>
+    `;
+
+    document.getElementById('shareCopyBtn').onclick = () => {
+      navigator.clipboard?.writeText(shareUrl).then(
+        () => toast('链接已复制到剪贴板'),
+        () => {
+          const ta = document.getElementById('shareUrlText');
+          ta.select();
+          document.execCommand('copy');
+          toast('链接已复制');
+        }
+      );
+    };
+    document.getElementById('shareTestBtn').onclick = () => {
+      window.open(shareUrl, '_blank');
+    };
+  } catch (err) {
+    console.error(err);
+    shareBody.innerHTML = `<div style="color:#ff9d9d;padding:20px">
+      生成分享链接失败：${escapeHtml(err.message || err)}
+    </div>`;
+  }
+}
+
+document.getElementById('shareClose').onclick = () => shareMask.classList.remove('show');
+document.getElementById('shareOk').onclick = () => shareMask.classList.remove('show');
+shareMask.addEventListener('click', e => {
+  if (e.target === shareMask) shareMask.classList.remove('show');
+});
+
+/* =========================================================================
+ *  从 URL hash 恢复数据（分享链接）
+ * ========================================================================= */
+async function tryRestoreFromHash() {
+  const hash = location.hash || '';
+  const m = hash.match(/[#&]data=([^&]+)/);
+  if (!m) return false;
+  try {
+    const decoded = decodeURIComponent(m[1]);
+    const json = await decompressData(decoded);
+    const data = JSON.parse(json);
+    if (!data.nodes || !Array.isArray(data.nodes)) throw new Error('数据格式错误');
+
+    state.nodes = data.nodes.map(n => ({
+      ...n,
+      note: n.note || '',
+      images: n.images || [],
+      collapsed: !!n.collapsed,
+      color: n.color || null,
+      rules: n.rules || []
+    }));
+    state.edges = data.edges || [];
+    state.freeMove = !!data.freeMove;
+    if (typeof data.autoLayoutOnToggle === 'boolean') {
+      autoLayoutOnToggle = data.autoLayoutOnToggle;
+    }
+    render();
+    if (data.zoom && data.zoom !== 1) applyZoom(data.zoom);
+    toast('已从分享链接加载数据（' + state.nodes.length + ' 个节点）');
+    history.replaceState(null, '', location.pathname + location.search);
+    return true;
+  } catch (e) {
+    console.error('从分享链接恢复失败', e);
+    toast('分享链接解析失败：' + (e.message || e));
+    return false;
+  }
+}
+
+/* =========================================================================
+ *  CSV 解析 & 导入
+ * ========================================================================= */
+const importMask = document.getElementById('importMask');
+const importBody = document.getElementById('importBody');
+const importRunBtn = document.getElementById('importRun');
+const importClearFileBtn = document.getElementById('importClearFile');
+
+let importState = {
+  fileName: '', fileSize: 0, parsedRows: [],
+  builtNodes: [], builtEdges: [], errors: [], warnings: [], previewRows: []
+};
+
+function parseCSV(text) {
+  if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+  const rows = [];
+  let row = [];
+  let cell = '';
+  let i = 0;
+  let inQuotes = false;
+  while (i < text.length) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { cell += '"'; i += 2; continue; }
+        inQuotes = false; i++; continue;
+      }
+      cell += c; i++;
+    } else {
+      if (c === '"') { inQuotes = true; i++; continue; }
+      if (c === ',') { row.push(cell); cell = ''; i++; continue; }
+      if (c === '\r') { i++; continue; }
+      if (c === '\n') { row.push(cell); rows.push(row); row = []; cell = ''; i++; continue; }
+      cell += c; i++;
+    }
+  }
+  if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
+  return rows;
+}
+
+function parseRuleToken(token) {
+  const t = token.trim();
+  if (!t) return null;
+
+  let m = t.match(/^(选项|choice|C)\s*[:：]\s*(.+)$/i);
+  if (m) {
+    const opts = m[2].split(/[|｜]/).map(s => s.trim()).filter(Boolean).map(s => {
+      const parts = s.split(/[:：]/);
+      if (parts.length >= 2) return { code: parts[0].trim(), label: parts.slice(1).join(':').trim() };
+      return { code: s, label: s };
+    });
+    if (!opts.length) return null;
+    return {
+      type: 'choice',
+      options: opts.map(o => `${o.code}:${o.label}`).join(','),
+      selected: opts[0].code
+    };
+  }
+
+  m = t.match(/^(序号|seq|S)\s*[:：]\s*(.+)$/i);
+  if (m) {
+    const parts = m[2].split(/[|｜]/).map(s => s.trim());
+    const value = Number(parts[0]) || 1;
+    const digits = Number(parts[1]) || 2;
+    const auto = parts[2] && /^(自动|auto|是|yes|1|true)$/i.test(parts[2]);
+    return { type: 'seq', value, digits, auto: !!auto };
+  }
+
+  m = t.match(/^(日期|date|D)\s*[:：]\s*(.*)$/i);
+  if (m) return { type: 'date', format: m[2].trim() || 'YYYYMMDD' };
+
+  m = t.match(/^(固定文本|固定|fixed|F)\s*[:：]\s*(.+)$/i);
+  if (m) return { type: 'fixed', text: m[2] };
+
+  return { type: 'fixed', text: t };
+}
+
+function detectColumns(rows) {
+  if (!rows.length) {
+    return { hasHeader: false, colMap: { name: 0, parent: 1, baseId: 2, note: 3, rules: [4] } };
+  }
+  const first = rows[0].map(c => String(c || '').trim().toLowerCase());
+  const headerKeywords = ['名称', 'name', 'title', '节点名称', '父节点', 'parent',
+                          '起始id', 'baseid', '备注', 'note', '规则', 'rules', '字段', 'field'];
+  const isHeader = first.some(c => headerKeywords.some(k => c === k.toLowerCase() || c.includes(k.toLowerCase())));
+
+  if (!isHeader) {
+    const rulesCols = [];
+    for (let i = 4; i < Math.max(5, first.length); i++) rulesCols.push(i);
+    return { hasHeader: false, colMap: { name: 0, parent: 1, baseId: 2, note: 3, rules: rulesCols } };
+  }
+
+  const colMap = { name: -1, parent: -1, baseId: -1, note: -1, rules: [] };
+  first.forEach((h, i) => {
+    if (colMap.name < 0 && /^(名称|节点名称|name|title|产品名称)$/i.test(h)) colMap.name = i;
+    else if (colMap.parent < 0 && /^(父节点|父级|parent|parentname|上级|父节点名称)$/i.test(h)) colMap.parent = i;
+    else if (colMap.baseId < 0 && /^(起始id|baseid|起始文本|起始文本id|base|起始)$/i.test(h)) colMap.baseId = i;
+    else if (colMap.note < 0 && /^(备注|note|remark|说明|description)$/i.test(h)) colMap.note = i;
+    else if (/^(规则|rules|字段|field|rule)/i.test(h)) colMap.rules.push(i);
+  });
+  if (colMap.name < 0) colMap.name = 0;
+  if (colMap.parent < 0) colMap.parent = 1;
+  if (colMap.baseId < 0) colMap.baseId = 2;
+  if (colMap.note < 0) colMap.note = 3;
+  if (!colMap.rules.length) {
+    for (let i = 4; i < first.length; i++) colMap.rules.push(i);
+  }
+  return { hasHeader: true, colMap };
+}
+
+function buildImportData(rows) {
+  const { hasHeader, colMap } = detectColumns(rows);
+  const startRow = hasHeader ? 1 : 0;
+  const errors = [], warnings = [], entries = [];
+
+  for (let i = startRow; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || !row.length) continue;
+    if (row.every(c => !String(c || '').trim())) continue;
+
+    const name = String(row[colMap.name] || '').trim();
+    if (!name) { errors.push({ row: i + 1, msg: '名称为空' }); continue; }
+
+    const parentRef = String(row[colMap.parent] || '').trim();
+    const baseId    = String(row[colMap.baseId] || '').trim();
+    const note      = String(row[colMap.note] || '').trim();
+
+    let ruleTokens = [];
+    for (const ci of colMap.rules) {
+      const cell = row[ci];
+      if (cell && String(cell).trim()) {
+        ruleTokens.push(...String(cell).split(/[;；]/).map(s => s.trim()).filter(Boolean));
+      }
+    }
+    const rules = ruleTokens.map(parseRuleToken).filter(Boolean);
+
+    entries.push({ rowIdx: i + 1, name, parentRef, baseId, note, rules });
+  }
+
+  const existingByName = new Map();
+  const existingById = new Map();
+  for (const n of state.nodes) {
+    if (!existingByName.has(n.title)) existingByName.set(n.title, n);
+    const id = computeId(n);
+    if (id && !existingById.has(id)) existingById.set(id, n);
+  }
+
+  const nameCount = new Map();
+  for (const e of entries) nameCount.set(e.name, (nameCount.get(e.name) || 0) + 1);
+  for (const [nm, cnt] of nameCount) {
+    if (cnt > 1 && !existingByName.has(nm)) {
+      warnings.push({ row: '-', msg: `名称「${nm}」在导入数据中重复 ${cnt} 次` });
+    }
+  }
+
+  const pending = entries.map(e => ({ ...e, node: null, parent: null }));
+  let changed = true, iter = 0;
+  const resolvedMap = new Map();
+
+  while (pending.length && changed && iter++ < 200) {
+    changed = false;
+    for (let i = pending.length - 1; i >= 0; i--) {
+      const item = pending[i];
+      let parentNode = null;
+      if (item.parentRef) {
+        parentNode = resolvedMap.get(item.parentRef) || null;
+        if (!parentNode) parentNode = existingByName.get(item.parentRef) || null;
+        if (!parentNode) parentNode = existingById.get(item.parentRef) || null;
+        if (!parentNode) continue;
+      }
+
+      const kind = parentNode ? 'rule' : 'root';
+      const depth = parentNode ? ((computeNodeDepth().get(parentNode.id) ?? 0) + 1) : 0;
+      const node = {
+        id: uid('n'), kind, title: item.name,
+        x: 0, y: 0,
+        baseId: kind === 'root' ? (item.baseId || 'AB') : undefined,
+        rules: kind === 'rule'
+          ? (item.rules.length ? item.rules : [{ type: 'seq', value: 1, digits: 2, auto: true }])
+          : undefined,
+        note: item.note || '',
+        images: [], collapsed: false,
+        color: levelColorOf(depth)
+      };
+      item.node = node;
+      item.parent = parentNode;
+      pending.splice(i, 1);
+      resolvedMap.set(item.name, node);
+      changed = true;
+    }
+  }
+
+  for (const item of pending) {
+    errors.push({ row: item.rowIdx, msg: `父节点「${item.parentRef}」未找到或存在循环引用` });
+  }
+
+  const builtNodes = [], builtEdges = [];
+  const resolved = entries.filter(e => e.node);
+  for (const item of resolved) {
+    builtNodes.push(item.node);
+    if (item.parent) {
+      builtEdges.push({ id: uid('e'), from: item.parent.id, to: item.node.id });
+    }
+  }
+
+  const savedNodes = state.nodes, savedEdges = state.edges;
+  state.nodes = [...savedNodes, ...builtNodes];
+  state.edges = [...savedEdges, ...builtEdges];
+  let preview;
+  try {
+    preview = builtNodes.map(n => ({
+      node: n,
+      name: n.title,
+      parentName: n.kind === 'root' ? '' : (parentOf(n.id)?.title || ''),
+      id: computeId(n),
+      kind: n.kind,
+      ruleCount: n.rules ? n.rules.length : 0,
+      ruleSummary: n.kind === 'rule' ? summarizeRules(n.rules) : '',
+      error: null
+    }));
+    const conflicts = checkDuplicates();
+    for (const p of preview) {
+      if (conflicts.has(p.node.id)) p.error = '同级重复';
+    }
+  } finally {
+    state.nodes = savedNodes;
+    state.edges = savedEdges;
+  }
+
+  return { builtNodes, builtEdges, errors, warnings, preview };
+}
+
+function summarizeRules(rules) {
+  return rules.map(r => {
+    switch (r.type) {
+      case 'fixed':  return `固定:${r.text || ''}`;
+      case 'choice': return `选项:${(parseOptions(r.options).length)}项`;
+      case 'seq':    return `序号:${r.value}~/${r.digits}位${r.auto ? '·自动' : ''}`;
+      case 'date':   return `日期:${r.format || ''}`;
+    }
+    return '';
+  }).join(' | ');
+}
+
+function renderImportDialog() {
+  const body = importBody;
+
+  if (!importState.fileName) {
+    body.innerHTML = `
+      <div class="import-drop" id="importDrop">
+        <div class="id-icon">📥</div>
+        <div class="id-title">拖放 CSV 文件到此处，或点击选择</div>
+        <div class="id-hint">支持 UTF-8 / GBK 编码，第一行可以是表头</div>
+      </div>
+      <div class="import-help">
+        <b>CSV 列格式说明：</b>
+        <div class="rules-list">
+          <div><span class="k">名称</span><span>必填，节点名称</span></div>
+          <div><span class="k">父节点</span><span>上级节点的名称或订货号，留空表示起始节点</span></div>
+          <div><span class="k">起始ID</span><span>仅起始节点使用，如 <code>AB</code></span></div>
+          <div><span class="k">备注</span><span>可选</span></div>
+          <div><span class="k">规则1/2/3…</span><span>每个单元格写 1 个或多个规则，用 <code>;</code> 分隔</span></div>
+        </div>
+        <b>规则写法：</b>
+        <div class="rules-list">
+          <div><span class="k">固定文本</span><span>直接写文本，如 <code>-A</code>；或 <code>固定:-A</code></span></div>
+          <div><span class="k">选项</span><span><code>选项:01:红色|02:蓝色</code></span></div>
+          <div><span class="k">序号</span><span><code>序号:1|2|自动</code>（起始|位数|是否自动）</span></div>
+          <div><span class="k">日期</span><span><code>日期:YYYYMMDD</code></span></div>
+        </div>
+      </div>
+    `;
+    const drop = document.getElementById('importDrop');
+    if (drop) {
+      drop.onclick = () => pickCSVFile();
+      drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('drag-over'); });
+      drop.addEventListener('dragleave', () => drop.classList.remove('drag-over'));
+      drop.addEventListener('drop', e => {
+        e.preventDefault();
+        drop.classList.remove('drag-over');
+        const f = e.dataTransfer.files[0];
+        if (f) handleCSVFile(f);
+      });
+    }
+    importRunBtn.disabled = true;
+    importClearFileBtn.style.display = 'none';
+    return;
+  }
+
+  const { fileName, fileSize, parsedRows, builtNodes, errors, warnings, previewRows } = importState;
+  const errCount = errors.length;
+  const warnCount = warnings.length;
+  const nodeCount = builtNodes.length;
+  const sizeStr = fileSize < 1024 ? fileSize + ' B'
+                : fileSize < 1024 * 1024 ? (fileSize / 1024).toFixed(1) + ' KB'
+                : (fileSize / 1024 / 1024).toFixed(2) + ' MB';
+
+  let html = `
+    <div class="import-file-info">
+      <div class="fi-icon">📄</div>
+      <div class="fi-main">
+        <div class="fi-name">${escapeHtml(fileName)}</div>
+        <div class="fi-meta">${sizeStr} · 共 ${parsedRows.length} 行数据</div>
+      </div>
+    </div>
+    <div class="import-stats">
+      <span class="ist-chip ok">✓ 将创建 ${nodeCount} 个节点</span>
+      ${warnCount ? `<span class="ist-chip warn">⚠ ${warnCount} 条警告</span>` : ''}
+      ${errCount  ? `<span class="ist-chip err">✗ ${errCount} 条错误</span>` : ''}
+    </div>
+    <div class="import-options">
+      <label><input type="radio" name="impMode" value="append" checked> 追加到当前画布</label>
+      <label><input type="radio" name="impMode" value="replace"> 清空后导入</label>
+      <label><input type="checkbox" id="impAutoLayout" checked> 导入后自动排版</label>
+    </div>
+  `;
+
+  if (errors.length) {
+    html += `<div class="import-help" style="border-color:rgba(239,68,68,.4);background:rgba(239,68,68,.06);color:#ff9d9d">
+      <b>❌ 错误（这些行将被跳过）：</b>
+      <div class="rules-list">
+        ${errors.slice(0, 10).map(e => `<div><span class="k">第 ${e.row} 行</span><span>${escapeHtml(e.msg)}</span></div>`).join('')}
+      </div>
+    </div>`;
+  }
+  if (warnings.length) {
+    html += `<div class="import-help" style="border-color:rgba(255,183,77,.4);background:rgba(255,183,77,.06);color:#ffce7a">
+      <b>⚠ 警告：</b>
+      <div class="rules-list">
+        ${warnings.slice(0, 5).map(w => `<div><span class="k">第 ${w.row} 行</span><span>${escapeHtml(w.msg)}</span></div>`).join('')}
+      </div>
+    </div>`;
+  }
+
+  html += `<div style="margin:12px 0 6px;font-size:12px;color:var(--muted)">节点预览：</div>
+    <div class="import-preview">
+      <div class="import-row head">
+        <span>状态</span><span>名称</span><span>父节点</span><span>订货号</span><span>规则</span>
+      </div>`;
+  const showRows = previewRows.slice(0, 200);
+  for (const p of showRows) {
+    const statusIcon = p.error ? '⚠' : '✓';
+    const statusCls = p.error ? 'warn' : 'ok';
+    const parentTxt = p.kind === 'root' ? '（起始节点）' : (p.parentName || '—');
+    const parentCls = p.kind === 'root' ? 'iparent root' : 'iparent';
+    const idTxt = p.id == null ? '未连接' : (p.id || '（空）');
+    const idCls = p.error === '同级重复' ? 'iid err' : 'iid';
+    html += `<div class="import-row">
+      <span class="ist ${statusCls}">${statusIcon}</span>
+      <span class="iname">${escapeHtml(p.name)}</span>
+      <span class="${parentCls}">${escapeHtml(parentTxt)}</span>
+      <span class="${idCls}">${escapeHtml(idTxt)}</span>
+      <span class="irule">${escapeHtml(p.ruleSummary || '')}</span>
+    </div>`;
+  }
+  if (previewRows.length > showRows.length) {
+    html += `<div class="import-row" style="justify-content:center;color:var(--muted);font-size:11px">
+      还有 ${previewRows.length - showRows.length} 个节点…
+    </div>`;
+  }
+  html += `</div>`;
+
+  body.innerHTML = html;
+  importRunBtn.disabled = nodeCount === 0;
+  importRunBtn.textContent = `导入 ${nodeCount} 个节点`;
+  importClearFileBtn.style.display = '';
+}
+
+function pickCSVFile() {
+  const inp = document.createElement('input');
+  inp.type = 'file';
+  inp.accept = '.csv,text/csv,text/plain';
+  inp.onchange = () => {
+    const f = inp.files[0];
+    if (f) handleCSVFile(f);
+  };
+  inp.click();
+}
+
+async function handleCSVFile(file) {
+  try {
+    const buffer = await file.arrayBuffer();
+    let text = new TextDecoder('UTF-8').decode(buffer);
+    if (text.includes('\uFFFD')) {
+      try { text = new TextDecoder('GBK').decode(buffer); } catch (e) {}
+    }
+    const rows = parseCSV(text);
+    if (!rows.length) { toast('文件为空'); return; }
+
+    const built = buildImportData(rows);
+    importState.fileName = file.name;
+    importState.fileSize = file.size;
+    importState.parsedRows = rows;
+    importState.builtNodes = built.builtNodes;
+    importState.builtEdges = built.builtEdges;
+    importState.errors = built.errors;
+    importState.warnings = built.warnings;
+    importState.previewRows = built.preview;
+    renderImportDialog();
+  } catch (err) {
+    console.error(err);
+    toast('读取文件失败：' + (err.message || err));
+  }
+}
+
+function openImportDialog() {
+  importState = { fileName: '', fileSize: 0, parsedRows: [], builtNodes: [], builtEdges: [], errors: [], warnings: [], previewRows: [] };
+  renderImportDialog();
+  importMask.classList.add('show');
+}
+function closeImportDialog() { importMask.classList.remove('show'); }
+
+document.getElementById('btnImport').onclick = openImportDialog;
+document.getElementById('importClose').onclick = closeImportDialog;
+document.getElementById('importCancel').onclick = closeImportDialog;
+importMask.addEventListener('click', e => { if (e.target === importMask) closeImportDialog(); });
+importClearFileBtn.onclick = () => { importState.fileName = ''; renderImportDialog(); };
+
+document.getElementById('importTemplate').onclick = () => {
+  const tpl = [
+    ['名称', '父节点', '起始ID', '备注', '规则1', '规则2'],
+    ['产品A', '', 'AB', '起始产品族', '', ''],
+    ['红色款', '产品A', '', '颜色变体', '选项:01:红色|02:蓝色', ''],
+    ['蓝色款', '产品A', '', '颜色变体', '选项:01:红色|02:蓝色', ''],
+    ['小号', '红色款', '', '尺寸变体', '序号:1|2|自动', ''],
+    ['大号', '红色款', '', '尺寸变体', '序号:1|2|自动', ''],
+    ['出口版', '大号', '', '带日期码', '', '日期:YYYYMM']
+  ];
+  const esc = v => {
+    const s = String(v == null ? '' : v);
+    return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+  const csv = '\uFEFF' + tpl.map(r => r.map(esc).join(',')).join('\r\n');
+  downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), '订货号导入模板.csv');
+  toast('模板已下载');
+};
+
+importRunBtn.onclick = () => {
+  const { builtNodes, builtEdges, errors } = importState;
+  if (!builtNodes.length) return toast('没有可导入的节点');
+  const mode = document.querySelector('input[name="impMode"]:checked')?.value || 'append';
+  const autoLayoutAfter = document.getElementById('impAutoLayout')?.checked;
+
+  if (mode === 'replace') {
+    if (!confirm(`将清空当前 ${state.nodes.length} 个节点，替换为导入的 ${builtNodes.length} 个节点。继续？`)) return;
+    state.nodes = []; state.edges = []; selectedIds.clear();
+  }
+  state.nodes.push(...builtNodes);
+  state.edges.push(...builtEdges);
+  closeImportDialog();
+  render(); markDirty();
+  toast(`成功导入 ${builtNodes.length} 个节点` + (errors.length ? `（${errors.length} 行被跳过）` : ''));
+  if (autoLayoutAfter && state.nodes.length) {
+    setTimeout(() => autoLayout('vertical'), 50);
+  }
+};
+
 /* =========================================================================
  *  文件保存 / 读取
  * ========================================================================= */
@@ -2314,8 +3598,9 @@ const saveStatusEl = document.getElementById('saveStatus');
 
 function serialize() {
   return JSON.stringify({
-    v: 6,
+    v: 9,
     freeMove: state.freeMove,
+    autoLayoutOnToggle,           // ★ 保存自动排版开关
     zoom,
     nodes: state.nodes.map(n => ({
       id: n.id, kind: n.kind, title: n.title,
@@ -2392,7 +3677,7 @@ document.getElementById('btnOpenFile').onclick = async () => {
       fileDirty = false;
       lastSavedTime = new Date().toTimeString().slice(0, 8);
       updateSaveStatus();
-      toast('已打开文件，后续修改会自动保存');
+      toast('已打开文件');
     } catch (e) { if (e.name !== 'AbortError') toast('打开失败'); }
     return;
   }
@@ -2410,6 +3695,10 @@ function loadFromText(text) {
     }));
     state.edges = data.edges || [];
     setFreeMove(!!data.freeMove, true);
+    if (typeof data.autoLayoutOnToggle === 'boolean') {
+      autoLayoutOnToggle = data.autoLayoutOnToggle;
+      updateAutoToggleBtn();
+    }
     selectedIds.clear();
     render();
     if (data.zoom) applyZoom(data.zoom);
@@ -2437,7 +3726,8 @@ document.getElementById('btnRoot').onclick = () => {
     x: 80 + (count % 3) * 380,
     y: 80 + Math.floor(count / 3) * 260,
     baseId: 'AB',
-    note: '', images: [], collapsed: false, color: null
+    note: '', images: [], collapsed: false,
+    color: levelColorOf(0)
   };
   state.nodes.push(node);
   render();
@@ -2455,14 +3745,28 @@ document.getElementById('btnRoot').onclick = () => {
 /* =========================================================================
  *  初始化
  * ========================================================================= */
-function init() {
-  // 初始化画布尺寸记录
+async function init() {
   canvas.dataset.w = 4600;
   canvas.dataset.h = 3400;
   canvas.style.transform = 'scale(1)';
   updateZoomWrap();
   updateZoomDisplay();
 
+  // 先同步按钮显示状态
+  updateAutoToggleBtn();
+
+  // 1) 优先尝试从 URL hash 恢复（分享链接）
+  const fromHash = await tryRestoreFromHash();
+  if (fromHash) {
+    setFreeMove(state.freeMove, true);
+    updateAutoToggleBtn();
+    updateSaveStatus();
+    updateSelectionBar();
+    window.addEventListener('resize', () => { drawEdges(); });
+    return;
+  }
+
+  // 2) 从本地缓存恢复
   const raw = localStorage.getItem('order-node-app');
   let restored = false;
   if (raw) {
@@ -2475,6 +3779,9 @@ function init() {
         }));
         state.edges = data.edges || [];
         state.freeMove = !!data.freeMove;
+        if (typeof data.autoLayoutOnToggle === 'boolean') {
+          autoLayoutOnToggle = data.autoLayoutOnToggle;
+        }
         restored = true;
         if (data.zoom && data.zoom !== 1) {
           zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, data.zoom));
@@ -2486,23 +3793,27 @@ function init() {
     } catch (e) {}
   }
 
+  // 3) 默认示例
   if (!restored) {
     const root = {
       id: uid('n'), kind: 'root', title: '产品族',
       x: 120, y: 200, baseId: 'AB',
-      note: '', images: [], collapsed: false, color: null
+      note: '', images: [], collapsed: false,
+      color: levelColorOf(0)
     };
     const c1 = {
       id: uid('n'), kind: 'rule', title: '子产品 A',
       x: 490, y: 100,
       rules: [{ type: 'seq', value: 1, digits: 2, auto: true }],
-      note: '', images: [], collapsed: false, color: null
+      note: '', images: [], collapsed: false,
+      color: levelColorOf(1)
     };
     const c2 = {
       id: uid('n'), kind: 'rule', title: '子产品 B',
       x: 490, y: 360,
       rules: [{ type: 'seq', value: 1, digits: 2, auto: true }],
-      note: '', images: [], collapsed: false, color: null
+      note: '', images: [], collapsed: false,
+      color: levelColorOf(1)
     };
     state.nodes.push(root, c1, c2);
     state.edges.push(
@@ -2511,6 +3822,7 @@ function init() {
     );
   }
 
+  updateAutoToggleBtn();
   render();
   setFreeMove(state.freeMove, true);
   updateSaveStatus();
