@@ -1721,30 +1721,31 @@ function drawGuides() {
 }
 
 /**
- * 计算拖动时的吸附与辅助线
- * @returns {snapX, snapY, guides:{v:[],h:[]}}
+ * 计算拖动时的吸附与辅助线（按矩形计算，供单节点与批量整组共用）
+ * @param {{x:number,y:number,w:number,h:number}} rect 拖动中的矩形（画布坐标）
+ * @param {Set<string>} excludeIds 不参与对齐比较的节点（自身 / 整组）
+ * @returns {snapX, snapY, guideX, guideY}
  */
-function computeSnapAndGuides(node, nx, ny, excludeIds) {
-  const w = node._w || NODE_W;
-  const h = node._h || DEF_H;
+function computeRectSnapAndGuides(rect, excludeIds) {
+  const w = rect.w;
+  const h = rect.h;
   const threshold = SNAP_THRESHOLD_PX / zoom;
 
-  // 节点自身的关键 X/Y（绝对坐标 + 到左边/上边的偏移）
+  // 拖动方自身的关键 X/Y（绝对坐标）
   const myX = [
-    { pos: nx,         off: 0 },
-    { pos: nx + w / 2, off: w / 2 },
-    { pos: nx + w,     off: w }
+    { pos: rect.x,         off: 0 },
+    { pos: rect.x + w / 2, off: w / 2 },
+    { pos: rect.x + w,     off: w }
   ];
   const myY = [
-    { pos: ny,         off: 0 },
-    { pos: ny + h / 2, off: h / 2 },
-    { pos: ny + h,     off: h }
+    { pos: rect.y,         off: 0 },
+    { pos: rect.y + h / 2, off: h / 2 },
+    { pos: rect.y + h,     off: h }
   ];
 
   let bestX = null, bestY = null;
 
   for (const o of state.nodes) {
-    if (o.id === node.id) continue;
     if (excludeIds.has(o.id)) continue;
     if (!visibleSet.has(o.id)) continue;
 
@@ -1783,6 +1784,14 @@ function computeSnapAndGuides(node, nx, ny, excludeIds) {
     guideX: bestX ? bestX.guideX : null,
     guideY: bestY ? bestY.guideY : null
   };
+}
+
+/** 单节点拖动：沿用原签名 */
+function computeSnapAndGuides(node, nx, ny, excludeIds) {
+  return computeRectSnapAndGuides(
+    { x: nx, y: ny, w: node._w || NODE_W, h: node._h || DEF_H },
+    excludeIds
+  );
 }
 
 /* =========================================================================
@@ -2305,13 +2314,17 @@ function setFreeMove(v, silent) {
   if (state.freeMove) {
     btn.textContent = '🔓 自由移动';
     btn.classList.add('free');
-    btn.title = '当前：可随意拖动（可重叠）。点击切回防重叠';
+    btn.title = '当前：可随意拖动（可重叠）；对齐辅助线与吸附仍然生效。点击切回防重叠';
   } else {
     btn.textContent = '🔒 防重叠';
     btn.classList.remove('free');
-    btn.title = '当前：拖动时自动避让其他节点。点击切换为自由移动';
+    btn.title = '当前：拖动时自动避让其他节点，并对齐辅助线/吸附。点击切换为自由移动';
   }
-  if (!silent) toast(state.freeMove ? '已切换到自由移动模式' : '已切换到防重叠模式');
+  if (!silent) {
+    toast(state.freeMove
+      ? '已切换到自由移动模式（可重叠，对齐辅助线仍生效）'
+      : '已切换到防重叠模式（拖动自动避让）');
+  }
 }
 document.getElementById('btnMoveMode').onclick = () => {
   if (guardReadOnly()) return;
@@ -2600,6 +2613,24 @@ stage.addEventListener('mousedown', e => { if (e.button === 1) e.preventDefault(
 stage.addEventListener('auxclick', e => { if (e.button === 1) e.preventDefault(); });
 
 /* =========================================================================
+ *  ★ 点击画布退出文字编辑
+ * ========================================================================= */
+function isTextEditingEl(el) {
+  if (!el || el === document.body || el === document.documentElement) return false;
+  if (el.isContentEditable) return true;
+  const tag = (el.tagName || '').toLowerCase();
+  return tag === 'input' || tag === 'textarea';
+}
+// 画布上按下时，若正在编辑某输入框而按下的又不是它自己，先退出编辑态
+// （画布的 pointerdown 会 preventDefault 以支持框选/拖动，浏览器默认的失焦因此被抑制）
+function exitTextEditing(target) {
+  const ae = document.activeElement;
+  if (!isTextEditingEl(ae)) return;
+  if (target && (target === ae || ae.contains(target))) return;
+  ae.blur();
+}
+
+/* =========================================================================
  *  路径提示
  * ========================================================================= */
 const pathTooltipEl = document.getElementById('pathTooltip');
@@ -2818,6 +2849,7 @@ function connect(fromId, toId) {
 canvas.addEventListener('pointerdown', e => {
   if (e.button === 1) { startPan(e); return; }  // 中键：拖动画布（不受只读模式限制）
   if (e.button === 2) return;  // 右键交给 contextmenu
+  exitTextEditing(e.target);   // ★ 点击画布（含空白处）退出文字编辑
   hidePathTooltip();
   closeCtxMenu();
   if (e.altKey && e.target.closest('.node')) return;
@@ -2865,6 +2897,17 @@ function startDrag(e, nodeEl) {
 
   const initialPositions = movingNodes.map(n => ({ node: n, ox: n.x, oy: n.y }));
 
+  // ★ 整组包围盒（批量拖动时用于「整组对齐」辅助线）
+  const groupRect = (() => {
+    let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+    for (const n of movingNodes) {
+      const w = n._w || NODE_W, h = n._h || DEF_H;
+      x1 = Math.min(x1, n.x);     y1 = Math.min(y1, n.y);
+      x2 = Math.max(x2, n.x + w); y2 = Math.max(y2, n.y + h);
+    }
+    return { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
+  })();
+
   if (isBatch) {
     movingNodes.forEach(n => {
       const nel = canvas.querySelector(`.node[data-id="${n.id}"]`);
@@ -2887,7 +2930,7 @@ function startDrag(e, nodeEl) {
     const dy = (ev.clientY - sy) / zoom;
 
     if (isBatch) {
-      // 批量移动：尝试整组位移 + 是否吸附
+      // 批量移动：整组位移 + 整组对齐辅助线 + 可选防重叠
       const tryMove = (dx, dy) => {
         for (const item of initialPositions) {
           const nx = Math.max(0, item.ox + dx);
@@ -2896,12 +2939,37 @@ function startDrag(e, nodeEl) {
         }
         return true;
       };
-      const freeMode = state.freeMove || ev.altKey;
+      const freeMode = state.freeMove || ev.altKey;  // 是否跳过防重叠避让
+      const snapOn   = !ev.altKey;                   // 对齐辅助线/吸附：与自由移动无关，仅 Alt 临时关闭
+
       let fx = dx, fy = dy;
+      // 整组不越出画布左/上边界（同时保持组内相对位置）
+      fx = Math.max(fx, -groupRect.x);
+      fy = Math.max(fy, -groupRect.y);
+
+      // ★ 整组对齐：拿整组包围盒与组外节点比较
+      if (snapOn) {
+        const snap = computeRectSnapAndGuides(
+          { x: groupRect.x + fx, y: groupRect.y + fy, w: groupRect.w, h: groupRect.h },
+          movingSet
+        );
+        fx += snap.snapX;
+        fy += snap.snapY;
+        activeGuides.v = snap.guideX !== null ? [snap.guideX] : [];
+        activeGuides.h = snap.guideY !== null ? [snap.guideY] : [];
+        drawGuides();
+      } else {
+        clearGuides();
+      }
+
+      // 吸附后再次保证不越界
+      fx = Math.max(fx, -groupRect.x);
+      fy = Math.max(fy, -groupRect.y);
+
       if (!freeMode) {
-        if (!tryMove(dx, dy)) {
-          if (tryMove(dx, 0)) fy = 0;
-          else if (tryMove(0, dy)) fx = 0;
+        if (!tryMove(fx, fy)) {
+          if (tryMove(fx, 0)) fy = 0;
+          else if (tryMove(0, fy)) fx = 0;
           else { fx = 0; fy = 0; }
         }
       }
@@ -2914,19 +2982,18 @@ function startDrag(e, nodeEl) {
           nel.style.top  = item.node.y + 'px';
         }
       }
-      // 批量移动不显示辅助线（整组对齐复杂）
-      clearGuides();
       scheduleDraw();
     } else {
       // 单节点移动
       const nx0 = Math.max(0, initialPositions[0].ox + dx);
       const ny0 = Math.max(0, initialPositions[0].oy + dy);
 
-      const freeMode = state.freeMove || ev.altKey;
+      const freeMode = state.freeMove || ev.altKey;  // 是否跳过防重叠避让
+      const snapOn   = !ev.altKey;                   // 对齐辅助线/吸附：与自由移动无关，仅 Alt 临时关闭
 
       // ★ 对齐辅助线 + 吸附
       let nx = nx0, ny = ny0;
-      if (!freeMode) {
+      if (snapOn) {
         const snap = computeSnapAndGuides(node, nx0, ny0, new Set([node.id]));
         if (snap.guideX !== null) {
           nx = nx0 + snap.snapX;
