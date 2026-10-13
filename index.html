@@ -108,10 +108,7 @@
     pointer-events: none !important;
     opacity: .55;
   }
-  body.readonly-mode .node .port{
-    opacity: .3;
-  }
-  body.readonly-mode .node.dragging .node-head{ cursor: default !important; }
+  body.readonly-mode .node .port{ opacity: .3; }
   body.readonly-mode .node .node-head{ cursor: default !important; }
 
   /* ---------------- 画布 ---------------- */
@@ -159,18 +156,31 @@
   .node.search-dim{ opacity:.2; }
   .node.search-hit{ box-shadow:0 0 0 3px rgba(255,183,77,.4),0 8px 24px rgba(0,0,0,.5); }
   .node.flash{ animation:flash 1.15s ease; }
+  .node.alt-hover{ box-shadow:0 0 0 2px rgba(76,141,255,.5), 0 8px 24px rgba(0,0,0,.5); }
   @keyframes flash{
     0%,100%{ outline:0 solid transparent; }
     25%{ outline:4px solid var(--accent); outline-offset:4px; }
   }
 
   .node-head{
-    display:flex; align-items:center; gap:3px; padding:7px 7px 7px 6px;
+    display:flex; align-items:center; gap:2px; padding:6px 6px 6px 5px;
     background:linear-gradient(180deg,#212a3a,#1b2230);
     border-radius:11px 11px 0 0; border-bottom:1px solid var(--border);
     cursor:grab;
   }
-  .node.collapsed .node-head{ border-bottom:none; border-radius:11px; }
+  /* 折叠状态：头部圆角独立成型 */
+  .node.collapsed .node-head,
+  .node.body-collapsed .node-head{
+    border-bottom:none; border-radius:11px;
+  }
+  /* 折叠状态：隐藏 body */
+  .node.collapsed .node-body,
+  .node.body-collapsed .node-body{ display:none; }
+
+  /* 折叠时边框用虚线区分 */
+  .node.body-collapsed{ border-style:dashed; }
+  .node.collapsed{ border-style:dashed; }
+
   .node.dragging .node-head{ cursor:grabbing; }
   .node-title{
     flex:1; min-width:0; background:transparent; border:none; color:var(--text);
@@ -186,7 +196,27 @@
   }
   .icon-btn:hover{ background:#2a3341; color:#fff; }
   .icon-btn.del:hover{ background:#4a1e1e; color:#ff9d9d; }
-  .chev{ font-size:10px; }
+  .chev{ font-size:11px; }
+
+  /* ★ 子树折叠按钮：用蓝色底色和自身折叠按钮区分 */
+  .subtree-chev{
+    background:rgba(76,141,255,.12);
+    border:1px solid rgba(76,141,255,.28);
+    border-radius:5px;
+    font-size:11px;
+    width:22px; height:22px;
+    color:#9dc2ff;
+  }
+  .subtree-chev:hover{
+    background:rgba(76,141,255,.25);
+    border-color:var(--accent);
+    color:#fff;
+  }
+  .node.collapsed .subtree-chev{
+    background:rgba(76,141,255,.28);
+    border-color:var(--accent);
+    color:#fff;
+  }
 
   .color-dot{
     width:15px; height:15px; border-radius:50%; flex:none; cursor:pointer;
@@ -196,7 +226,6 @@
   .color-dot:hover{ transform:scale(1.15); }
 
   .node-body{ padding:10px 12px 12px; display:flex; flex-direction:column; gap:9px; }
-  .node.collapsed .node-body{ display:none; }
 
   .idrow{
     display:flex; align-items:center; gap:6px;
@@ -287,6 +316,29 @@
   }
   .add-img:hover{ border-color:var(--accent); color:var(--accent); }
 
+  /* 折叠状态下的小徽标 */
+  .img-count-badge, .subtree-badge{
+    display:none;
+    font-size:10px; padding:1px 5px; border-radius:9px;
+    font-family:ui-monospace,monospace;
+    margin-left:1px; flex:none;
+    line-height:1.4;
+    white-space:nowrap;
+  }
+  .img-count-badge{
+    background:rgba(76,141,255,.22); color:#9dc2ff;
+    border:1px solid rgba(76,141,255,.45);
+  }
+  .subtree-badge{
+    background:rgba(255,183,77,.18); color:#ffce7a;
+    border:1px solid rgba(255,183,77,.4);
+  }
+  /* 折叠（自身或子树）时显示 */
+  .node.collapsed .img-count-badge.has-content,
+  .node.body-collapsed .img-count-badge.has-content{ display:inline-block; }
+  .node.collapsed .subtree-badge.has-content,
+  .node.body-collapsed .subtree-badge.has-content{ display:inline-block; }
+
   /* ---------------- 端口 ---------------- */
   .port{
     position:absolute; width:13px; height:13px; border-radius:50%;
@@ -303,9 +355,9 @@
     position:fixed; z-index:60;
     background:#1c2330; border:1px solid var(--accent);
     border-radius:12px; padding:7px 12px;
-    display:none; align-items:center; gap:8px;
+    display:none; align-items:center; gap:6px;
     box-shadow:0 14px 40px rgba(0,0,0,.6), 0 0 0 3px rgba(76,141,255,.18);
-    font-size:13px;
+    font-size:13px; flex-wrap:wrap;
   }
   .selection-bar.show{ display:flex; }
   .selection-bar .sel-count{ color:#9dc2ff; font-size:12.5px; padding-right:6px; }
@@ -314,6 +366,7 @@
   body.readonly-mode #selDelete,
   body.readonly-mode #selColor,
   body.readonly-mode #selCollapse,
+  body.readonly-mode #selBodyCollapse,
   body.readonly-mode #selExpand{ display:none; }
 
   /* ---------------- 缩放控件 ---------------- */
@@ -412,6 +465,69 @@
   }
   .pt-id .lbl{ color:var(--muted); font-size:10.5px; font-family:inherit; margin-right:6px; }
 
+  /* ---------------- Alt + 悬停预览插图 ---------------- */
+  .alt-image-preview{
+    position:fixed; z-index:950;
+    background:#1c2330; border:1px solid #3a4a5e; border-radius:12px;
+    padding:12px;
+    box-shadow:0 14px 44px rgba(0,0,0,.8), 0 0 0 3px rgba(76,141,255,.15);
+    max-width:400px; max-height:440px; overflow:auto;
+    pointer-events:auto;
+    animation:altPreviewIn .13s ease;
+  }
+  @keyframes altPreviewIn{
+    from{ opacity:0; transform: translateY(-4px) scale(.98); }
+    to{ opacity:1; transform: translateY(0) scale(1); }
+  }
+  .alt-image-preview::-webkit-scrollbar{ width:10px; height:10px; }
+  .alt-image-preview::-webkit-scrollbar-thumb{ background:#3a4a5e; border-radius:5px; }
+  .alt-image-preview::-webkit-scrollbar-track{ background:#0f141c; }
+
+  .alt-preview-head{
+    color:#8a97ab; font-size:11px;
+    margin-bottom:9px;
+    display:flex; align-items:center; gap:6px; flex-wrap:wrap;
+    font-family:ui-monospace,monospace;
+    position:sticky; top:-12px; background:#1c2330;
+    padding:4px 0 8px; margin-top:-4px;
+    border-bottom:1px dashed #2a3341;
+  }
+  .alt-preview-head .ap-title{
+    color:#e6ebf2; font-weight:600; font-size:12px;
+    font-family:inherit;
+    max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .alt-preview-head .ap-id{
+    color:var(--gold); font-size:10.5px;
+    max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .alt-preview-head .ap-hint{
+    color:#6f7c90; font-size:10px;
+    margin-left:auto;
+  }
+
+  .alt-preview-grid{
+    display:grid;
+    grid-template-columns: repeat(auto-fill, minmax(102px, 1fr));
+    gap:8px;
+  }
+  .alt-preview-grid img{
+    width:100%; aspect-ratio: 1 / 1;
+    object-fit:cover; display:block;
+    border-radius:7px; border:1px solid #2a3341;
+    cursor:zoom-in; background:#0b0f15;
+    transition:.15s;
+  }
+  .alt-preview-grid img:hover{
+    border-color:#4c8dff;
+    transform: scale(1.04);
+    box-shadow: 0 6px 18px rgba(76,141,255,.4);
+  }
+  .alt-preview-tip{
+    color:#6f7c90; font-size:10.5px;
+    margin-top:8px; text-align:center;
+  }
+
   /* ---------------- 图片查看器 ---------------- */
   .img-viewer{
     position:fixed; inset:0; z-index:400;
@@ -473,14 +589,34 @@
     display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap;
   }
 
+  .export-table{ font-size:12.5px; }
+  .et-row{
+    display:grid; grid-template-columns:1fr 158px 54px 78px; gap:10px;
+    padding:7px 3px; border-bottom:1px dashed #222a36; align-items:baseline;
+  }
+  .et-row.head{
+    font-weight:600; color:var(--muted); border-bottom:1px solid var(--border);
+    position:sticky; top:0; background:var(--panel); z-index:1;
+    padding-top:10px; padding-bottom:8px;
+  }
+  .et-id{ font-family:ui-monospace,monospace; color:var(--gold); word-break:break-all; line-height:1.4; }
+  .et-id.bad{ color:#ff8b8b; }
+  .et-id.unlinked{ color:#5d6878; font-style:italic; font-family:inherit; }
+  .et-name{ color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .et-lv{ text-align:center; color:var(--muted); }
+  .et-st{ font-size:11.5px; text-align:center; }
+  .et-st.ok{ color:#7ddc9a; }
+  .et-st.bad{ color:#ff8b8b; }
+  .et-st.warn{ color:var(--muted); }
+  .export-tip{
+    padding:9px 12px; margin:0 0 10px;
+    background:rgba(76,141,255,.08); border:1px solid rgba(76,141,255,.25);
+    border-radius:8px; font-size:12px; color:#9dc2ff; line-height:1.6;
+  }
+
   /* 分享弹窗表单 */
-  .share-field{
-    display:flex; flex-direction:column; gap:6px;
-    margin-bottom:14px;
-  }
-  .share-field > label{
-    font-size:12px; color:var(--muted); font-weight:600;
-  }
+  .share-field{ display:flex; flex-direction:column; gap:6px; margin-bottom:14px; }
+  .share-field > label{ font-size:12px; color:var(--muted); font-weight:600; }
   .share-field input[type="text"],
   .share-field input[type="password"],
   .share-field textarea,
@@ -491,9 +627,7 @@
     outline:none;
   }
   .share-field textarea{ min-height:56px; resize:vertical; line-height:1.5; }
-  .share-field input:focus, .share-field textarea:focus, .share-field select:focus{
-    border-color:var(--accent);
-  }
+  .share-field input:focus, .share-field textarea:focus, .share-field select:focus{ border-color:var(--accent); }
   .share-row{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
   .share-row .share-field{ flex:1; min-width:150px; margin-bottom:0; }
   .share-checkbox{
@@ -542,13 +676,8 @@
     word-break:break-all;
   }
 
-  /* 密码输入 */
-  .pw-input-wrap{
-    position:relative; display:flex; align-items:center;
-  }
-  .pw-input-wrap input{
-    width:100%; padding-right:42px !important;
-  }
+  .pw-input-wrap{ position:relative; display:flex; align-items:center; }
+  .pw-input-wrap input{ width:100%; padding-right:42px !important; }
   .pw-toggle{
     position:absolute; right:6px;
     background:transparent; border:none; color:var(--muted);
@@ -557,16 +686,13 @@
   }
   .pw-toggle:hover{ color:var(--text); background:#1c2330; }
 
-  /* 分享信息展示 */
   .share-meta-card{
     background:#0f141c; border:1px solid var(--border);
     border-radius:10px; padding:12px 14px; margin-bottom:14px;
     display:flex; flex-direction:column; gap:7px;
     font-size:12.5px;
   }
-  .share-meta-row{
-    display:flex; align-items:baseline; gap:10px;
-  }
+  .share-meta-row{ display:flex; align-items:baseline; gap:10px; }
   .share-meta-row .k{ color:var(--muted); min-width:64px; }
   .share-meta-row .v{ color:var(--text); flex:1; word-break:break-all; }
   .share-meta-row .v.hl{ color:var(--gold); font-weight:600; }
@@ -755,11 +881,12 @@
 <!-- 选择操作条 -->
 <div class="selection-bar" id="selectionBar">
   <span class="sel-count">已选 <b id="selCount">0</b> 项</span>
-  <button class="tbtn xs" id="selColor">🎨 改色</button>
-  <button class="tbtn xs" id="selCollapse">▸ 折叠</button>
-  <button class="tbtn xs" id="selExpand">▾ 展开</button>
-  <button class="tbtn xs danger" id="selDelete">🗑 删除</button>
-  <button class="tbtn xs" id="selClear">✕</button>
+  <button class="tbtn xs" id="selColor" title="为选中节点批量设置颜色">🎨 改色</button>
+  <button class="tbtn xs" id="selBodyCollapse" title="仅收缩选中节点的看板，保留子级可见">▸ 仅收自身</button>
+  <button class="tbtn xs" id="selCollapse" title="折叠选中节点及其所有子级">▼ 折叠子树</button>
+  <button class="tbtn xs" id="selExpand" title="完全展开选中节点及其子级">▾ 展开</button>
+  <button class="tbtn xs danger" id="selDelete" title="删除选中节点及其子节点">🗑 删除</button>
+  <button class="tbtn xs" id="selClear" title="取消选择 (Esc)">✕</button>
 </div>
 
 <!-- 缩放控件 -->
@@ -772,6 +899,13 @@
 
 <!-- 路径提示 -->
 <div class="path-tooltip" id="pathTooltip"></div>
+
+<!-- Alt + 悬停预览插图 -->
+<div class="alt-image-preview" id="altImagePreview" style="display:none">
+  <div class="alt-preview-head" id="altPreviewHead"></div>
+  <div class="alt-preview-grid" id="altPreviewGrid"></div>
+  <div class="alt-preview-tip">点击缩略图可放大查看</div>
+</div>
 
 <!-- 通用弹窗 -->
 <div class="modal-mask" id="modalMask">
@@ -949,7 +1083,7 @@ const state = { nodes: [], edges: [], freeMove: false };
 let visibleSet = new Set();
 const selectedIds = new Set();
 let autoLayoutOnToggle = true;
-let readOnlyMode = false;         // ★ 只读模式
+let readOnlyMode = false;
 
 const getNode  = id => state.nodes.find(n => n.id === id);
 const parentOf = id => {
@@ -965,13 +1099,11 @@ function applyReadOnlyUI() {
   if (readOnlyMode) {
     document.body.classList.add('readonly-mode');
     badge.classList.add('show');
-    // 禁用顶栏修改类按钮
     ['btnRoot','btnLayout','btnLayoutMenu','btnAutoToggle','btnMoveMode','btnLevelColor',
      'btnImport','btnSaveFile','btnSaveNow','btnOpenFile','btnClear'].forEach(id => {
       const b = document.getElementById(id);
       if (b) b.disabled = true;
     });
-    // 禁用画布拖拽和连线
     document.getElementById('selectionBar').classList.remove('show');
   } else {
     document.body.classList.remove('readonly-mode');
@@ -990,12 +1122,8 @@ document.getElementById('btnExitReadonly').onclick = () => {
   applyReadOnlyUI();
   toast('已退出只读模式');
 };
-
 function guardReadOnly() {
-  if (readOnlyMode) {
-    toast('只读模式，无法修改数据');
-    return true;
-  }
+  if (readOnlyMode) { toast('只读模式，无法修改数据'); return true; }
   return false;
 }
 
@@ -1012,12 +1140,8 @@ function levelColorOf(depth) {
 function applyLevelColorsToAll(silent) {
   if (guardReadOnly()) return;
   const depthMap = computeNodeDepth();
-  state.nodes.forEach(n => {
-    const d = depthMap.get(n.id) ?? 0;
-    n.color = levelColorOf(d);
-  });
-  render();
-  markDirty();
+  state.nodes.forEach(n => { n.color = levelColorOf(depthMap.get(n.id) ?? 0); });
+  render(); markDirty();
   if (!silent) toast('已按层级自动配色 · 同级同色');
 }
 document.getElementById('btnLevelColor').onclick = () => applyLevelColorsToAll(false);
@@ -1098,8 +1222,7 @@ function setCanvasSize(w, h) {
 stage.addEventListener('wheel', e => {
   if (!e.ctrlKey && !e.metaKey) return;
   e.preventDefault();
-  const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
-  applyZoom(zoom * factor, e.clientX, e.clientY);
+  applyZoom(zoom * (e.deltaY < 0 ? 1.15 : 1 / 1.15), e.clientX, e.clientY);
 }, { passive: false });
 
 document.getElementById('zoomIn').onclick  = () => applyZoom(zoom * 1.2);
@@ -1114,9 +1237,7 @@ document.getElementById('zoomFit').onclick = () => {
   const pad = 80;
   const fitW = (maxX - minX) + pad * 2;
   const fitH = (maxY - minY) + pad * 2;
-  const zx = stage.clientWidth / fitW;
-  const zy = stage.clientHeight / fitH;
-  const nz = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.min(zx, zy)));
+  const nz = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.min(stage.clientWidth / fitW, stage.clientHeight / fitH)));
   applyZoom(nz);
   setTimeout(() => {
     stage.scrollLeft = (minX - pad) * zoom;
@@ -1197,10 +1318,8 @@ function checkDuplicates() {
   for (const arr of groups.values()) {
     const seen = new Map();
     for (const { node, seg } of arr) {
-      if (seen.has(seg)) {
-        conflict.add(node.id);
-        conflict.add(seen.get(seg).id);
-      } else seen.set(seg, node);
+      if (seen.has(seg)) { conflict.add(node.id); conflict.add(seen.get(seg).id); }
+      else seen.set(seg, node);
     }
   }
   return conflict;
@@ -1218,6 +1337,12 @@ function computeNodeDepth() {
   state.nodes.forEach(n => { if (!d.has(n.id)) d.set(n.id, 0); });
   return d;
 }
+
+/* =========================================================================
+ *  可见性（折叠）
+ *  仅 `collapsed`（子树折叠）会隐藏后代
+ *  `bodyCollapsed`（仅收自身）只隐藏自身 body
+ * ========================================================================= */
 function computeVisible() {
   const visible = new Set();
   const guard = new Set();
@@ -1225,7 +1350,7 @@ function computeVisible() {
     if (!n || guard.has(n.id)) return;
     guard.add(n.id);
     visible.add(n.id);
-    if (n.collapsed) return;
+    if (n.collapsed) return;   // 只有「折叠子树」才会隐藏后代
     for (const e of state.edges) if (e.from === n.id) visit(getNode(e.to));
   };
   for (const n of state.nodes) if (n.kind === 'root') visit(n);
@@ -1275,7 +1400,7 @@ function measureNodeHeights() {
   for (const n of state.nodes) {
     const e = canvas.querySelector(`.node[data-id="${n.id}"]`);
     if (e) { n._w = e.offsetWidth; n._h = e.offsetHeight; }
-    else if (n.collapsed) { n._w = NODE_W; n._h = 42; }
+    else if (n.collapsed || n.bodyCollapsed) { n._w = n._w || NODE_W; n._h = 42; }
     else { n._w = n._w || NODE_W; n._h = n._h || DEF_H; }
   }
 }
@@ -1396,11 +1521,41 @@ function openColorPop(node, anchorBtn) {
   ci.oninput = () => { node.color = ci.value; applyNodeColor(canvas.querySelector(`.node[data-id="${node.id}"]`), ci.value); };
   ci.onchange = () => { node.color = ci.value; closeColorPop(); render(); markDirty(); };
   custom.appendChild(ci); pop.appendChild(custom);
-
   const reset = el('button', 'swatch', '∅'); reset.title = '恢复默认颜色';
   reset.onclick = ev => { ev.stopPropagation(); node.color = null; closeColorPop(); render(); markDirty(); };
   pop.appendChild(reset);
-
+  document.body.appendChild(pop);
+  colorPopEl = pop;
+  positionColorPop(pop, anchorBtn);
+  colorPopOutside = ev => {
+    if (colorPopEl && !colorPopEl.contains(ev.target) && !anchorBtn.contains(ev.target)) closeColorPop();
+  };
+  setTimeout(() => document.addEventListener('pointerdown', colorPopOutside, true), 0);
+}
+function openColorPopMulti(nodesArr, anchorBtn) {
+  if (guardReadOnly()) return;
+  closeColorPop();
+  const pop = el('div', 'color-pop');
+  PRESET_COLORS.forEach(c => {
+    const s = el('button', 'swatch');
+    s.style.background = c;
+    s.onclick = ev => { ev.stopPropagation(); nodesArr.forEach(n => n.color = c); closeColorPop(); render(); markDirty(); };
+    pop.appendChild(s);
+  });
+  const custom = el('label', 'swatch custom');
+  custom.title = '自定义颜色';
+  custom.style.background = 'conic-gradient(#f55,#fd5,#5f5,#5ff,#55f,#f5f,#f55)';
+  const ci = el('input'); ci.type = 'color'; ci.value = '#4c8dff';
+  ci.oninput = () => { nodesArr.forEach(n => n.color = ci.value); render(); };
+  ci.onchange = () => { closeColorPop(); markDirty(); };
+  custom.appendChild(ci); pop.appendChild(custom);
+  const reset = el('button', 'swatch', '∅'); reset.title = '恢复默认颜色';
+  reset.onclick = ev => {
+    ev.stopPropagation();
+    nodesArr.forEach(n => n.color = null);
+    closeColorPop(); render(); markDirty();
+  };
+  pop.appendChild(reset);
   document.body.appendChild(pop);
   colorPopEl = pop;
   positionColorPop(pop, anchorBtn);
@@ -1501,13 +1656,48 @@ function buildRuleEl(node, rule) {
 }
 
 /* =========================================================================
- *  折叠/展开
+ *  折叠逻辑 —— ★ 两种模式
  * ========================================================================= */
-function toggleCollapseNode(node) {
-  node.collapsed = !node.collapsed;
+
+/**
+ * 模式 1：仅折叠自身看板
+ * - 隐藏自己的 body（包含规则、备注、截图等）
+ * - 子级仍然可见，连线仍然保留
+ * - 与「折叠子树」互斥
+ */
+function toggleBodyCollapse(node) {
+  // 如果当前是折叠子树状态，先切换到仅收自身
+  if (node.collapsed) {
+    node.collapsed = false;
+    node.bodyCollapsed = true;
+  } else {
+    node.bodyCollapsed = !node.bodyCollapsed;
+  }
   render();
   if (!readOnlyMode) markDirty();
+  if (autoLayoutOnToggle && !readOnlyMode && state.nodes.length > 1) {
+    requestAnimationFrame(() => {
+      autoLayout('vertical', { forceFreeMove: false, toastMsg: false, scrollToStart: false });
+    });
+  }
+}
 
+/**
+ * 模式 2：折叠自身及所有子级
+ * - 隐藏自身 body
+ * - 隐藏所有后代节点
+ * - 与「仅收自身」互斥
+ */
+function toggleSubtreeCollapse(node) {
+  // 如果当前是仅收自身状态，切换到折叠子树
+  if (node.bodyCollapsed) {
+    node.bodyCollapsed = false;
+    node.collapsed = true;
+  } else {
+    node.collapsed = !node.collapsed;
+  }
+  render();
+  if (!readOnlyMode) markDirty();
   if (autoLayoutOnToggle && !readOnlyMode && state.nodes.length > 1) {
     requestAnimationFrame(() => {
       autoLayout('vertical', { forceFreeMove: false, toastMsg: false, scrollToStart: false });
@@ -1521,7 +1711,15 @@ function toggleCollapseNode(node) {
 let activeNodeId = null;
 
 function buildNodeEl(node) {
-  const wrap = el('div', 'node' + (node.kind === 'root' ? ' root' : '') + (node.collapsed ? ' collapsed' : ''));
+  const hasImages = !!(node.images && node.images.length);
+
+  // 统计直接子级数量（用于子树徽标）
+  const childCount = state.edges.filter(e => e.from === node.id).length;
+
+  const wrap = el('div', 'node'
+    + (node.kind === 'root' ? ' root' : '')
+    + (node.collapsed ? ' collapsed' : '')
+    + (node.bodyCollapsed ? ' body-collapsed' : ''));
   wrap.dataset.id = node.id;
   wrap.style.left = node.x + 'px';
   wrap.style.top  = node.y + 'px';
@@ -1537,13 +1735,27 @@ function buildNodeEl(node) {
   const head = el('div', 'node-head');
   if (node.color) head.style.background = `linear-gradient(180deg, ${hexA(node.color,.40)}, ${hexA(node.color,.12)})`;
 
-  const chev = el('button', 'icon-btn chev', node.collapsed ? '▸' : '▾');
-  chev.title = '折叠 / 展开';
-  chev.onclick = ev => { ev.stopPropagation(); toggleCollapseNode(node); };
+  /* ---------- 按钮 1：自身折叠（▾/▸） ---------- */
+  const chev = el('button', 'icon-btn chev', node.bodyCollapsed ? '▸' : '▾');
+  chev.title = node.bodyCollapsed
+    ? '展开自身看板（保留子级可见）'
+    : '折叠自身看板（保留子级可见）';
+  chev.onclick = ev => { ev.stopPropagation(); toggleBodyCollapse(node); };
+
+  /* ---------- 按钮 2：子树折叠（▼/▶） ---------- */
+  const subtreeChev = el('button', 'icon-btn subtree-chev', node.collapsed ? '▶' : '▼');
+  subtreeChev.title = node.collapsed
+    ? '展开子树（显示所有子级）'
+    : '折叠子树（隐藏自身看板及所有子级）';
+  subtreeChev.onclick = ev => { ev.stopPropagation(); toggleSubtreeCollapse(node); };
 
   const title = el('input', 'node-title');
   title.value = node.title;
   title.oninput = () => { if (readOnlyMode) { title.value = node.title; return; } node.title = title.value; markDirty(); };
+
+  // 折叠徽标（仅折叠时显示）
+  const imgBadge = el('span', 'img-count-badge' + (hasImages ? ' has-content' : ''), hasImages ? `📷${node.images.length}` : '');
+  const subBadge = el('span', 'subtree-badge' + (childCount > 0 ? ' has-content' : ''), childCount > 0 ? `+${childCount}` : '');
 
   const colorBtn = el('button', 'color-dot');
   colorBtn.title = '更改节点颜色';
@@ -1558,7 +1770,7 @@ function buildNodeEl(node) {
   delBtn.title = '删除节点（含其所有子节点）';
   delBtn.onclick = ev => { ev.stopPropagation(); if (guardReadOnly()) return; removeNode(node.id); };
 
-  head.append(chev, title, colorBtn, addBtn, delBtn);
+  head.append(chev, subtreeChev, title, imgBadge, subBadge, colorBtn, addBtn, delBtn);
   wrap.appendChild(head);
 
   const body = el('div', 'node-body');
@@ -1587,7 +1799,6 @@ function buildNodeEl(node) {
   idrow.addEventListener('mouseenter', e => showPathTooltip(node, e));
   idrow.addEventListener('mousemove', movePathTooltip);
   idrow.addEventListener('mouseleave', hidePathTooltip);
-
   body.appendChild(idrow);
 
   const warn = el('div', 'warn-bar', '⚠ 与同级节点编码重复，请调整字段');
@@ -1696,11 +1907,9 @@ document.getElementById('btnMoveMode').onclick = () => {
 function toggleSelectNode(nodeEl) {
   const id = nodeEl.dataset.id;
   if (selectedIds.has(id)) {
-    selectedIds.delete(id);
-    nodeEl.classList.remove('selected');
+    selectedIds.delete(id); nodeEl.classList.remove('selected');
   } else {
-    selectedIds.add(id);
-    nodeEl.classList.add('selected');
+    selectedIds.add(id); nodeEl.classList.add('selected');
   }
   updateSelectionBar();
 }
@@ -1711,29 +1920,18 @@ function applySelectionVisual() {
 }
 function clearSelection() {
   if (!selectedIds.size) return;
-  selectedIds.clear();
-  applySelectionVisual();
-  updateSelectionBar();
+  selectedIds.clear(); applySelectionVisual(); updateSelectionBar();
 }
 function selectAll() {
-  state.nodes.forEach(n => {
-    if (visibleSet.has(n.id)) selectedIds.add(n.id);
-  });
-  applySelectionVisual();
-  updateSelectionBar();
+  state.nodes.forEach(n => { if (visibleSet.has(n.id)) selectedIds.add(n.id); });
+  applySelectionVisual(); updateSelectionBar();
 }
-function getSelectedNodes() {
-  return state.nodes.filter(n => selectedIds.has(n.id));
-}
+function getSelectedNodes() { return state.nodes.filter(n => selectedIds.has(n.id)); }
 function updateSelectionBar() {
   const bar = document.getElementById('selectionBar');
   const cnt = document.getElementById('selCount');
-  if (selectedIds.size > 0) {
-    bar.classList.add('show');
-    cnt.textContent = selectedIds.size;
-  } else {
-    bar.classList.remove('show');
-  }
+  if (selectedIds.size > 0) { bar.classList.add('show'); cnt.textContent = selectedIds.size; }
+  else bar.classList.remove('show');
 }
 
 document.getElementById('selClear').onclick = clearSelection;
@@ -1761,27 +1959,46 @@ document.getElementById('selColor').onclick = ev => {
   if (!selected.length) return;
   openColorPopMulti(selected, ev.currentTarget);
 };
+/* 批量：仅收自身 */
+document.getElementById('selBodyCollapse').onclick = () => {
+  const selected = getSelectedNodes();
+  if (!selected.length) return;
+  // 若全部已仅收自身，则展开；否则全部仅收自身
+  const allCollapsed = selected.every(n => n.bodyCollapsed);
+  selected.forEach(n => {
+    n.bodyCollapsed = !allCollapsed;
+    if (!allCollapsed) n.collapsed = false;  // 清除子树折叠
+  });
+  render();
+  if (!readOnlyMode) markDirty();
+  if (autoLayoutOnToggle && !readOnlyMode && state.nodes.length > 1) {
+    requestAnimationFrame(() => autoLayout('vertical', { forceFreeMove: false, toastMsg: false, scrollToStart: false }));
+  }
+  toast(allCollapsed ? `已展开 ${selected.length} 个节点自身看板` : `已仅收自身 ${selected.length} 个节点`);
+};
+/* 批量：折叠子树 */
 document.getElementById('selCollapse').onclick = () => {
   const selected = getSelectedNodes();
   if (!selected.length) return;
-  selected.forEach(n => n.collapsed = true);
+  selected.forEach(n => { n.collapsed = true; n.bodyCollapsed = false; });
   render();
   if (!readOnlyMode) markDirty();
   if (autoLayoutOnToggle && !readOnlyMode && state.nodes.length > 1) {
     requestAnimationFrame(() => autoLayout('vertical', { forceFreeMove: false, toastMsg: false, scrollToStart: false }));
   }
-  toast(`已折叠 ${selected.length} 个节点`);
+  toast(`已折叠 ${selected.length} 个节点的子树`);
 };
+/* 批量：完全展开 */
 document.getElementById('selExpand').onclick = () => {
   const selected = getSelectedNodes();
   if (!selected.length) return;
-  selected.forEach(n => n.collapsed = false);
+  selected.forEach(n => { n.collapsed = false; n.bodyCollapsed = false; });
   render();
   if (!readOnlyMode) markDirty();
   if (autoLayoutOnToggle && !readOnlyMode && state.nodes.length > 1) {
     requestAnimationFrame(() => autoLayout('vertical', { forceFreeMove: false, toastMsg: false, scrollToStart: false }));
   }
-  toast(`已展开 ${selected.length} 个节点`);
+  toast(`已完全展开 ${selected.length} 个节点`);
 };
 
 /* =========================================================================
@@ -1792,29 +2009,21 @@ function startBoxSelect(e) {
   const start = toCanvas(e.clientX, e.clientY);
   const box = document.createElement('div');
   box.className = 'selection-box';
-  box.style.left = start.x + 'px';
-  box.style.top  = start.y + 'px';
-  box.style.width = '0px';
-  box.style.height = '0px';
+  box.style.left = start.x + 'px'; box.style.top = start.y + 'px';
+  box.style.width = '0px'; box.style.height = '0px';
   canvas.appendChild(box);
 
   if (!e.shiftKey && selectedIds.size > 0) {
-    selectedIds.clear();
-    applySelectionVisual();
-    updateSelectionBar();
+    selectedIds.clear(); applySelectionVisual(); updateSelectionBar();
   }
   const baseSelected = new Set(selectedIds);
 
   const move = ev => {
     const cur = toCanvas(ev.clientX, ev.clientY);
-    const x = Math.min(start.x, cur.x);
-    const y = Math.min(start.y, cur.y);
-    const w = Math.abs(cur.x - start.x);
-    const h = Math.abs(cur.y - start.y);
-    box.style.left = x + 'px';
-    box.style.top  = y + 'px';
-    box.style.width  = w + 'px';
-    box.style.height = h + 'px';
+    const x = Math.min(start.x, cur.x), y = Math.min(start.y, cur.y);
+    const w = Math.abs(cur.x - start.x), h = Math.abs(cur.y - start.y);
+    box.style.left = x + 'px'; box.style.top = y + 'px';
+    box.style.width = w + 'px'; box.style.height = h + 'px';
     selectedIds.clear();
     baseSelected.forEach(id => selectedIds.add(id));
     for (const n of state.nodes) {
@@ -1823,8 +2032,7 @@ function startBoxSelect(e) {
       const rw = n._w || NODE_W, rh = n._h || DEF_H;
       if (rx + rw >= x && rx <= x + w && ry + rh >= y && ry <= y + h) selectedIds.add(n.id);
     }
-    applySelectionVisual();
-    updateSelectionBar();
+    applySelectionVisual(); updateSelectionBar();
   };
   const up = () => {
     document.removeEventListener('pointermove', move);
@@ -1844,11 +2052,7 @@ function getPathChain(node) {
   const chain = [];
   let cur = node;
   const guard = new Set();
-  while (cur && !guard.has(cur.id)) {
-    guard.add(cur.id);
-    chain.unshift(cur);
-    cur = parentOf(cur.id);
-  }
+  while (cur && !guard.has(cur.id)) { guard.add(cur.id); chain.unshift(cur); cur = parentOf(cur.id); }
   return chain;
 }
 function showPathTooltip(node, e) {
@@ -1889,6 +2093,104 @@ function movePathTooltip(e) {
 function hidePathTooltip() { pathTooltipEl.classList.remove('show'); }
 
 /* =========================================================================
+ *  Alt + 悬停预览插图
+ * ========================================================================= */
+const altPreviewEl = document.getElementById('altImagePreview');
+const altPreviewHead = document.getElementById('altPreviewHead');
+const altPreviewGrid = document.getElementById('altPreviewGrid');
+
+let altKeyDown = false;
+let altPreviewNodeId = null;
+let altHoveredNodeEl = null;
+let mouseClientX = 0, mouseClientY = 0;
+
+function hideAltPreview() {
+  if (!altPreviewEl) return;
+  if (altPreviewEl.style.display !== 'none') altPreviewEl.style.display = 'none';
+  if (altHoveredNodeEl) { altHoveredNodeEl.classList.remove('alt-hover'); altHoveredNodeEl = null; }
+  altPreviewNodeId = null;
+}
+function buildAltPreviewContent(node) {
+  const id = computeId(node);
+  const idText = id == null ? '未连接' : (id || '（空）');
+  altPreviewHead.innerHTML = `
+    <span class="ap-title">${escapeHtml(node.title || '未命名')}</span>
+    <span class="ap-id">${escapeHtml(idText)}</span>
+    <span class="ap-hint">${node.images.length} 张 · Alt 松开隐藏</span>
+  `;
+  altPreviewGrid.innerHTML = node.images.map((src, i) =>
+    `<img src="${src}" data-idx="${i}" alt="插图 ${i + 1}" title="点击放大">`
+  ).join('');
+  altPreviewGrid.querySelectorAll('img[data-idx]').forEach(img => {
+    img.onclick = ev => {
+      ev.stopPropagation();
+      const idx = Number(img.dataset.idx);
+      hideAltPreview();
+      openImageViewer([...node.images], idx, node.title);
+    };
+  });
+}
+function positionAltPreview(clientX, clientY) {
+  requestAnimationFrame(() => {
+    if (altPreviewEl.style.display === 'none') return;
+    const w = altPreviewEl.offsetWidth, h = altPreviewEl.offsetHeight;
+    let left = clientX + 20, top = clientY + 18;
+    if (left + w > window.innerWidth - 12) left = clientX - w - 18;
+    if (top + h > window.innerHeight - 12) top = clientY - h - 18;
+    altPreviewEl.style.left = Math.max(10, left) + 'px';
+    altPreviewEl.style.top  = Math.max(10, top) + 'px';
+  });
+}
+function showAltPreview(node, clientX, clientY) {
+  if (!node || !node.images || !node.images.length) { hideAltPreview(); return; }
+  if (altPreviewNodeId !== node.id) {
+    altPreviewNodeId = node.id;
+    buildAltPreviewContent(node);
+  }
+  if (altPreviewEl.style.display !== 'block') altPreviewEl.style.display = 'block';
+  const nodeEl = canvas.querySelector(`.node[data-id="${node.id}"]`);
+  if (altHoveredNodeEl && altHoveredNodeEl !== nodeEl) altHoveredNodeEl.classList.remove('alt-hover');
+  if (nodeEl) { nodeEl.classList.add('alt-hover'); altHoveredNodeEl = nodeEl; }
+  positionAltPreview(clientX, clientY);
+}
+
+document.addEventListener('mousemove', e => {
+  mouseClientX = e.clientX; mouseClientY = e.clientY;
+}, true);
+
+document.addEventListener('mousemove', e => {
+  if (altPreviewEl && altPreviewEl.style.display === 'block' && altPreviewEl.contains(e.target)) return;
+  if (!altKeyDown) { if (altPreviewEl && altPreviewEl.style.display === 'block') hideAltPreview(); return; }
+  if (ivState.open) { hideAltPreview(); return; }
+  if (canvas.querySelector('.node.dragging')) { hideAltPreview(); return; }
+  const under = document.elementFromPoint(e.clientX, e.clientY);
+  const nodeEl = under?.closest?.('.node');
+  if (!nodeEl) { hideAltPreview(); return; }
+  const node = getNode(nodeEl.dataset.id);
+  if (!node) { hideAltPreview(); return; }
+  showAltPreview(node, e.clientX, e.clientY);
+}, true);
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Alt' || e.altKey) {
+    if (!altKeyDown) {
+      altKeyDown = true;
+      const under = document.elementFromPoint(mouseClientX, mouseClientY);
+      const nodeEl = under?.closest?.('.node');
+      if (nodeEl && !nodeEl.classList.contains('dragging')) {
+        const node = getNode(nodeEl.dataset.id);
+        if (node && node.images?.length) showAltPreview(node, mouseClientX, mouseClientY);
+      }
+    }
+  }
+});
+document.addEventListener('keyup', e => {
+  if (!e.altKey) { altKeyDown = false; hideAltPreview(); }
+});
+window.addEventListener('blur', () => { altKeyDown = false; hideAltPreview(); });
+stage.addEventListener('mouseleave', () => { if (altKeyDown) hideAltPreview(); });
+
+/* =========================================================================
  *  增删改
  * ========================================================================= */
 function addChild(parent) {
@@ -1899,11 +2201,14 @@ function addChild(parent) {
     id: uid('n'), kind: 'rule', title: '子产品',
     x: parent.x + 340, y: parent.y,
     rules: [{ type: 'seq', value: 1, digits: 2, auto: true }],
-    note: '', images: [], collapsed: false,
+    note: '', images: [],
+    collapsed: false, bodyCollapsed: false,   // ★ 两个折叠状态
     color: levelColorOf(newDepth)
   };
   state.nodes.push(node);
   state.edges.push({ id: uid('e'), from: parent.id, to: node.id });
+  // 新节点自动展开父节点（否则看不到）
+  if (parent.collapsed) parent.collapsed = false;
   render();
   if (!state.freeMove && collides(node, node.x, node.y)) {
     const spot = findFreeSpot(node, node.x, node.y);
@@ -1958,19 +2263,16 @@ function connect(fromId, toId) {
  * ========================================================================= */
 canvas.addEventListener('pointerdown', e => {
   hidePathTooltip();
+  if (e.altKey && e.target.closest('.node')) return;
+
   const nodeEl = e.target.closest('.node');
   activeNodeId = nodeEl ? nodeEl.dataset.id : null;
 
-  // 只读模式：允许框选和折叠，禁止拖拽和连线
   if (readOnlyMode) {
-    if (e.target.closest('.chev')) return;
+    if (e.target.closest('.chev') || e.target.closest('.subtree-chev')) return;
     if (e.target.closest('input, select, button, textarea, label')) return;
     if (!nodeEl) { startBoxSelect(e); return; }
-    if (nodeEl && (e.ctrlKey || e.metaKey)) {
-      e.preventDefault();
-      toggleSelectNode(nodeEl);
-      return;
-    }
+    if (nodeEl && (e.ctrlKey || e.metaKey)) { e.preventDefault(); toggleSelectNode(nodeEl); return; }
     if (nodeEl) { toggleSelectNode(nodeEl); return; }
     return;
   }
@@ -1982,9 +2284,7 @@ canvas.addEventListener('pointerdown', e => {
   if (e.target.closest('input, select, button, textarea, label, .port')) return;
 
   if (nodeEl && (e.ctrlKey || e.metaKey)) {
-    e.preventDefault();
-    toggleSelectNode(nodeEl);
-    return;
+    e.preventDefault(); toggleSelectNode(nodeEl); return;
   }
   if (nodeEl) {
     if (!selectedIds.has(nodeEl.dataset.id) && selectedIds.size > 0) clearSelection();
@@ -2005,10 +2305,10 @@ function startDrag(e, nodeEl) {
   let moved = false;
   const move = ev => {
     moved = true;
+    if (altPreviewEl && altPreviewEl.style.display === 'block') hideAltPreview();
     const dx = (ev.clientX - sx) / zoom;
     const dy = (ev.clientY - sy) / zoom;
-    const nx = Math.max(0, ox + dx);
-    const ny = Math.max(0, oy + dy);
+    const nx = Math.max(0, ox + dx), ny = Math.max(0, oy + dy);
     let fx = node.x, fy = node.y;
     if (state.freeMove || ev.altKey) { fx = nx; fy = ny; }
     else {
@@ -2031,7 +2331,6 @@ function startDrag(e, nodeEl) {
   document.addEventListener('pointermove', move);
   document.addEventListener('pointerup', up);
 }
-
 function startLink(e, fromId) {
   if (guardReadOnly()) return;
   e.preventDefault(); e.stopPropagation();
@@ -2062,7 +2361,6 @@ function startLink(e, fromId) {
   document.addEventListener('pointermove', move);
   document.addEventListener('pointerup', up);
 }
-
 function unlink(e, toId) {
   if (guardReadOnly()) return;
   e.preventDefault(); e.stopPropagation();
@@ -2087,8 +2385,7 @@ document.addEventListener('keydown', e => {
   const tag = (document.activeElement?.tagName || '').toLowerCase();
   const editing = tag === 'input' || tag === 'textarea' || tag === 'select';
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a' && !editing) {
-    e.preventDefault();
-    selectAll();
+    e.preventDefault(); selectAll();
   } else if (e.key === 'Escape' && !editing) {
     if (selectedIds.size > 0) { e.preventDefault(); clearSelection(); }
   }
@@ -2120,9 +2417,7 @@ function computeDepths() {
     visibleKidsOf(n).forEach(c => dfs(c, d + 1));
   };
   rootNodes().forEach(r => dfs(r, 0));
-  state.nodes.forEach(n => {
-    if (!depth.has(n.id)) { depth.set(n.id, 0); order.push(n); }
-  });
+  state.nodes.forEach(n => { if (!depth.has(n.id)) { depth.set(n.id, 0); order.push(n); } });
   return { depth, order };
 }
 function fitCanvasSize() {
@@ -2151,8 +2446,7 @@ function layoutTree() {
       w = kids.reduce((s, k, i) => s + subtreeW(k) + (i ? H_GAP : 0), 0);
       w = Math.max(w, NODE_W);
     }
-    wCache.set(n.id, w);
-    return w;
+    wCache.set(n.id, w); return w;
   }
   function place(n, left) {
     const d = depth.get(n.id) ?? 0;
@@ -2191,8 +2485,7 @@ function autoLayout(mode = 'vertical', opts = {}) {
   measureNodeHeights();
   if (mode === 'tree') layoutTree(); else layoutVertical();
   fitCanvasSize();
-  render();
-  markDirty();
+  render(); markDirty();
   if (forceFreeMove) setFreeMove(true, true);
   if (scrollToStart) stage.scrollTo({ left: 0, top: 0, behavior: 'smooth' });
   if (toastMsg) toast(mode === 'tree' ? '已按「横向树形」排列' : '已按「往右竖向」排列');
@@ -2277,8 +2570,7 @@ function compressImage(file, maxW = 1100, quality = 0.78) {
         const c = document.createElement('canvas');
         c.width = w; c.height = h;
         const ctx = c.getContext('2d');
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, w, h);
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, w, h);
         ctx.drawImage(img, 0, 0, w, h);
         resolve(c.toDataURL('image/jpeg', quality));
       };
@@ -2302,6 +2594,7 @@ const ivIdxEl  = document.getElementById('ivIdx');
 
 function openImageViewer(images, index, title) {
   if (!images || !images.length) return;
+  hideAltPreview();
   ivState.images = images;
   ivState.index  = Math.max(0, Math.min(index, images.length - 1));
   ivState.title  = title || '';
@@ -2359,7 +2652,6 @@ ivStage.addEventListener('wheel', e => {
   const my = e.clientY - r.top - r.height / 2;
   zoomAt(ivState.scale * (e.deltaY < 0 ? 1.14 : 1 / 1.14), mx, my);
 }, { passive: false });
-
 ivStage.addEventListener('pointerdown', e => {
   if (e.button !== 0) return;
   e.preventDefault();
@@ -2400,8 +2692,7 @@ const searchCount = document.getElementById('searchCount');
 
 function doSearch(q) {
   searchQuery = q.trim().toLowerCase();
-  searchHits = [];
-  searchIdx = -1;
+  searchHits = []; searchIdx = -1;
   if (!searchQuery) { applySearchHighlight(); updateSearchCount(); return; }
   let needRender = false;
   for (const n of state.nodes) {
@@ -2416,8 +2707,7 @@ function doSearch(q) {
     }
   }
   if (needRender) render();
-  applySearchHighlight();
-  updateSearchCount();
+  applySearchHighlight(); updateSearchCount();
 }
 function applySearchHighlight() {
   const nodes = canvas.querySelectorAll('.node');
@@ -2486,10 +2776,8 @@ function zipStore(files) {
     const lh = new Uint8Array(30 + nameBytes.length);
     const dv = new DataView(lh.buffer);
     dv.setUint32(0, 0x04034B50, true);
-    dv.setUint16(4, 20, true);
-    dv.setUint16(6, 0x0800, true);
-    dv.setUint16(8, 0, true);
-    dv.setUint16(10, 0, true);
+    dv.setUint16(4, 20, true); dv.setUint16(6, 0x0800, true);
+    dv.setUint16(8, 0, true); dv.setUint16(10, 0, true);
     dv.setUint16(12, 0x21, true);
     dv.setUint32(14, crc, true);
     dv.setUint32(18, data.length, true);
@@ -2501,20 +2789,16 @@ function zipStore(files) {
     const cd = new Uint8Array(46 + nameBytes.length);
     const dv2 = new DataView(cd.buffer);
     dv2.setUint32(0, 0x02014B50, true);
-    dv2.setUint16(4, 20, true);
-    dv2.setUint16(6, 20, true);
+    dv2.setUint16(4, 20, true); dv2.setUint16(6, 20, true);
     dv2.setUint16(8, 0x0800, true);
-    dv2.setUint16(10, 0, true);
-    dv2.setUint16(12, 0, true);
+    dv2.setUint16(10, 0, true); dv2.setUint16(12, 0, true);
     dv2.setUint16(14, 0x21, true);
     dv2.setUint32(16, crc, true);
     dv2.setUint32(20, data.length, true);
     dv2.setUint32(24, data.length, true);
     dv2.setUint16(28, nameBytes.length, true);
-    dv2.setUint16(30, 0, true);
-    dv2.setUint16(32, 0, true);
-    dv2.setUint16(34, 0, true);
-    dv2.setUint16(36, 0, true);
+    dv2.setUint16(30, 0, true); dv2.setUint16(32, 0, true);
+    dv2.setUint16(34, 0, true); dv2.setUint16(36, 0, true);
     dv2.setUint32(38, 0, true);
     dv2.setUint32(42, offset, true);
     cd.set(nameBytes, 46);
@@ -2525,8 +2809,7 @@ function zipStore(files) {
   const eocd = new Uint8Array(22);
   const dv3 = new DataView(eocd.buffer);
   dv3.setUint32(0, 0x06054B50, true);
-  dv3.setUint16(4, 0, true);
-  dv3.setUint16(6, 0, true);
+  dv3.setUint16(4, 0, true); dv3.setUint16(6, 0, true);
   dv3.setUint16(8, files.length, true);
   dv3.setUint16(10, files.length, true);
   dv3.setUint32(12, centralSize, true);
@@ -2641,12 +2924,9 @@ function collectExportData() {
     return {
       node: n,
       id: id === null ? '未连接' : (id || '（空）'),
-      idRaw: id,
-      name: n.title || '',
-      depth,
+      idRaw: id, name: n.title || '', depth,
       parentName: p ? (p.title || '') : '—',
-      note: n.note || '',
-      status,
+      note: n.note || '', status,
       imageCount: (n.images || []).length,
       isLeaf: !state.edges.some(e => e.from === n.id),
       isRoot: n.kind === 'root'
@@ -2727,8 +3007,7 @@ document.getElementById('btnExport').onclick = () => {
     showCopy: true, showDownload: true,
     onXlsx: () => {
       try {
-        const sheetRows = buildSheetRows();
-        downloadBlob(buildXlsxBlob(sheetRows, [30, 24, 8, 24, 40, 8, 12, 10]), `订货号_${todayStamp()}.xlsx`);
+        downloadBlob(buildXlsxBlob(buildSheetRows(), [30, 24, 8, 24, 40, 8, 12, 10]), `订货号_${todayStamp()}.xlsx`);
         toast('已生成 Excel 文件');
       } catch (err) { toast('生成 Excel 失败：' + (err.message || err)); }
     },
@@ -2757,14 +3036,10 @@ function openDashboard() {
   dashSearchQuery = '';
   const inp = document.getElementById('dashSearchInput');
   if (inp) inp.value = '';
-  renderDashboardStats();
-  renderDashboardTable();
+  renderDashboardStats(); renderDashboardTable();
   setTimeout(() => inp?.focus(), 80);
 }
-function closeDashboard() {
-  dashboardOpen = false;
-  dashboardMask.classList.remove('show');
-}
+function closeDashboard() { dashboardOpen = false; dashboardMask.classList.remove('show'); }
 document.getElementById('btnDashboard').onclick = openDashboard;
 document.getElementById('dashClose').onclick = closeDashboard;
 dashboardMask.addEventListener('click', e => { if (e.target === dashboardMask) closeDashboard(); });
@@ -2799,7 +3074,6 @@ function renderDashboardStats() {
     <div class="dstat"><span class="dv">${imgTotal}</span><span class="dl">截图</span></div>
   `;
 }
-
 function renderDashboardTable() {
   if (!dashboardOpen) return;
   const tbody = document.getElementById('dashTbody');
@@ -2852,11 +3126,9 @@ function renderDashboardTable() {
     };
   });
 }
-
 document.getElementById('dashLevelColor').onclick = () => {
   applyLevelColorsToAll(false);
-  renderDashboardStats();
-  renderDashboardTable();
+  renderDashboardStats(); renderDashboardTable();
 };
 document.getElementById('dashFit').onclick = () => {
   closeDashboard();
@@ -2871,17 +3143,15 @@ document.getElementById('dashExportXlsx').onclick = () => {
 document.getElementById('dashShare').onclick = () => openShareDialog();
 
 /* =========================================================================
- *  安全分享：加密 / 压缩 / 只读 / 有效期
+ *  安全分享
  * ========================================================================= */
 const shareMask = document.getElementById('shareMask');
 const shareBody = document.getElementById('shareBody');
 const pwMask = document.getElementById('pwMask');
 const pwBody = document.getElementById('pwBody');
-
 const hasSubtle = !!(window.crypto && window.crypto.subtle && window.crypto.subtle.importKey);
 const hasCompression = typeof CompressionStream !== 'undefined';
 
-/* --- Base64URL 工具 --- */
 function bytesToBase64Url(bytes) {
   let bin = '';
   const chunk = 0x8000;
@@ -2898,21 +3168,14 @@ function base64UrlToBytes(s) {
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
   return bytes;
 }
-
-/* --- gzip 压缩 / 解压 --- */
 async function gzipCompress(bytes) {
   if (!hasCompression) return null;
   const cs = new CompressionStream('gzip');
   const writer = cs.writable.getWriter();
-  writer.write(bytes);
-  writer.close();
+  writer.write(bytes); writer.close();
   const chunks = [];
   const reader = cs.readable.getReader();
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-  }
+  while (true) { const { done, value } = await reader.read(); if (done) break; chunks.push(value); }
   let total = 0;
   for (const c of chunks) total += c.length;
   const out = new Uint8Array(total);
@@ -2924,15 +3187,10 @@ async function gzipDecompress(bytes) {
   if (!hasCompression) throw new Error('浏览器不支持解压');
   const ds = new DecompressionStream('gzip');
   const writer = ds.writable.getWriter();
-  writer.write(bytes);
-  writer.close();
+  writer.write(bytes); writer.close();
   const chunks = [];
   const reader = ds.readable.getReader();
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-  }
+  while (true) { const { done, value } = await reader.read(); if (done) break; chunks.push(value); }
   let total = 0;
   for (const c of chunks) total += c.length;
   const out = new Uint8Array(total);
@@ -2940,8 +3198,6 @@ async function gzipDecompress(bytes) {
   for (const c of chunks) { out.set(c, o); o += c.length; }
   return out;
 }
-
-/* --- PBKDF2 + AES-GCM 加解密 --- */
 async function deriveKey(password, salt) {
   const enc = new TextEncoder();
   const keyMaterial = await crypto.subtle.importKey(
@@ -2949,10 +3205,7 @@ async function deriveKey(password, salt) {
   );
   return crypto.subtle.deriveKey(
     { name: 'PBKDF2', salt, iterations: 150000, hash: 'SHA-256' },
-    keyMaterial,
-    { name: 'AES-GCM', length: 256 },
-    false,
-    ['encrypt', 'decrypt']
+    keyMaterial, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']
   );
 }
 async function encryptWithPassword(jsonStr, password) {
@@ -2961,26 +3214,18 @@ async function encryptWithPassword(jsonStr, password) {
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const key = await deriveKey(password, salt);
   const enc = new TextEncoder();
-  const cipherBuf = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv }, key, enc.encode(jsonStr)
-  );
+  const cipherBuf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, enc.encode(jsonStr));
   const cipher = new Uint8Array(cipherBuf);
-  // 尝试对密文 gzip 压缩以缩短 URL
-  let body = cipher;
-  let compressed = false;
+  let body = cipher, compressed = false;
   if (hasCompression) {
     try {
       const gz = await gzipCompress(cipher);
       if (gz && gz.length < cipher.length) { body = gz; compressed = true; }
     } catch (e) {}
   }
-  // 结构: magic(1) + flags(1) + salt(16) + iv(12) + body
   const out = new Uint8Array(2 + 16 + 12 + body.length);
-  out[0] = 0xA7;                      // magic
-  out[1] = compressed ? 0x01 : 0x00;  // flags: bit0 = gzip
-  out.set(salt, 2);
-  out.set(iv, 18);
-  out.set(body, 30);
+  out[0] = 0xA7; out[1] = compressed ? 0x01 : 0x00;
+  out.set(salt, 2); out.set(iv, 18); out.set(body, 30);
   return 'E' + bytesToBase64Url(out);
 }
 async function decryptWithPassword(encoded, password) {
@@ -2991,15 +3236,11 @@ async function decryptWithPassword(encoded, password) {
   const salt = raw.slice(2, 18);
   const iv = raw.slice(18, 30);
   let body = raw.slice(30);
-  if (flags & 0x01) {
-    body = await gzipDecompress(body);
-  }
+  if (flags & 0x01) body = await gzipDecompress(body);
   const key = await deriveKey(password, salt);
   const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, body);
   return new TextDecoder().decode(plainBuf);
 }
-
-/* --- 无密码时的压缩编码 --- */
 async function compressPayload(str) {
   const bytes = new TextEncoder().encode(str);
   if (!hasCompression) return 'U' + bytesToBase64Url(bytes);
@@ -3012,26 +3253,20 @@ async function compressPayload(str) {
 async function decompressPayload(encoded) {
   const prefix = encoded[0];
   const body = encoded.slice(1);
-  if (prefix === 'U') {
-    return new TextDecoder().decode(base64UrlToBytes(body));
-  }
+  if (prefix === 'U') return new TextDecoder().decode(base64UrlToBytes(body));
   if (prefix === 'Z') {
     const bytes = base64UrlToBytes(body);
     const plain = await gzipDecompress(bytes);
     return new TextDecoder().decode(plain);
   }
-  // 兼容旧格式（无前缀）
   if (encoded.startsWith('raw_')) return new TextDecoder().decode(base64UrlToBytes(encoded.slice(4)));
   if (encoded.startsWith('gz_')) {
     const bytes = base64UrlToBytes(encoded.slice(3));
     const plain = await gzipDecompress(bytes);
     return new TextDecoder().decode(plain);
   }
-  // 尝试直接 base64 解码
   return new TextDecoder().decode(base64UrlToBytes(encoded));
 }
-
-/* --- 分享数据打包 --- */
 function stripImagesForShare() {
   return {
     freeMove: state.freeMove,
@@ -3042,23 +3277,21 @@ function stripImagesForShare() {
       x: n.x, y: n.y,
       baseId: n.baseId, rules: n.rules,
       note: n.note, images: [],
-      collapsed: n.collapsed, color: n.color || null
+      collapsed: n.collapsed,
+      bodyCollapsed: n.bodyCollapsed || false,  // ★ 分享携带
+      color: n.color || null
     })),
     edges: state.edges
   };
 }
-
-/* --- 分享弹窗 --- */
 function openShareDialog() {
   if (!state.nodes.length) return toast('还没有任何节点可分享');
   renderShareForm();
   shareMask.classList.add('show');
 }
-
 function renderShareForm() {
   const isLocal = location.protocol === 'file:';
   const imgCount = state.nodes.reduce((s, n) => s + (n.images?.length || 0), 0);
-
   let localHint = '';
   if (isLocal) {
     localHint = `<div class="share-hint warn">
@@ -3069,18 +3302,14 @@ function renderShareForm() {
   if (!hasSubtle) {
     localHint += `<div class="share-hint warn">
       ⚠ 当前浏览器环境不支持 Web Crypto（需 HTTPS 或 localhost），<b>密码加密不可用</b>。
-      您可以仍使用不含密码的压缩分享，但无加密保护。
     </div>`;
   }
-
   const imgHint = imgCount > 0
     ? `<div class="share-hint warn">⚠ 当前有 ${imgCount} 张截图，出于链接长度考虑，分享链接不包含截图。</div>`
     : '';
-
   shareBody.innerHTML = `
     ${localHint}
     ${imgHint}
-
     <div class="share-field">
       <label>🔑 访问密码（可选，建议设置）</label>
       <div class="pw-input-wrap">
@@ -3088,7 +3317,6 @@ function renderShareForm() {
         <button type="button" class="pw-toggle" id="sharePwToggle">👁</button>
       </div>
     </div>
-
     <div class="share-row">
       <div class="share-field">
         <label>⏱ 链接有效期</label>
@@ -3105,20 +3333,15 @@ function renderShareForm() {
         <input type="text" id="shareNote" placeholder="如：给客户的报价版本">
       </div>
     </div>
-
     <label class="share-checkbox">
       <input type="checkbox" id="shareReadOnly" checked>
       🔒 只读模式（接收者只能查看，不能修改）
     </label>
-
     <div style="margin-top:14px">
       <button class="tbtn success" id="shareGenBtn" style="width:100%;padding:10px">🔗 生成安全分享链接</button>
     </div>
-
     <div id="shareResult"></div>
   `;
-
-  // 密码显示切换
   const pwInput = document.getElementById('sharePw');
   const pwToggle = document.getElementById('sharePwToggle');
   if (pwToggle) {
@@ -3127,35 +3350,25 @@ function renderShareForm() {
       else { pwInput.type = 'password'; pwToggle.textContent = '👁'; }
     };
   }
-
   document.getElementById('shareGenBtn').onclick = generateShareLink;
 }
-
 async function generateShareLink() {
   const pwInput = document.getElementById('sharePw');
   const expireSel = document.getElementById('shareExpire');
   const noteInput = document.getElementById('shareNote');
   const roCheck = document.getElementById('shareReadOnly');
   const resultEl = document.getElementById('shareResult');
-
   const password = pwInput ? pwInput.value : '';
   const expireMs = Number(expireSel?.value || 0);
   const sharerNote = noteInput ? noteInput.value.trim() : '';
   const readOnlyFlag = !!(roCheck && roCheck.checked);
-
-  if (password && !hasSubtle) {
-    return toast('当前环境不支持加密，请留空密码或切换浏览器');
-  }
-  if (password && password.length < 4) {
-    return toast('密码太短，至少 4 位');
-  }
-
+  if (password && !hasSubtle) return toast('当前环境不支持加密，请留空密码或切换浏览器');
+  if (password && password.length < 4) return toast('密码太短，至少 4 位');
   resultEl.innerHTML = '<div style="padding:14px;text-align:center;color:#8a97ab">正在生成…</div>';
-
   try {
     const now = Date.now();
     const payload = {
-      v: 10,
+      v: 11,
       meta: {
         createdAt: now,
         expiresAt: expireMs > 0 ? now + expireMs : null,
@@ -3166,7 +3379,6 @@ async function generateShareLink() {
       data: stripImagesForShare()
     };
     const json = JSON.stringify(payload);
-
     let hashPart;
     if (password) {
       const encoded = await encryptWithPassword(json, password);
@@ -3175,19 +3387,16 @@ async function generateShareLink() {
       const encoded = await compressPayload(json);
       hashPart = 'data=' + encoded;
     }
-
     const baseUrl = location.href.split('#')[0];
     const shareUrl = `${baseUrl}#${hashPart}`;
     const urlSize = shareUrl.length;
     const sizeStr = urlSize < 1024 ? urlSize + ' 字符' : (urlSize / 1024).toFixed(1) + ' K 字符';
-
     const expireText = expireMs === 0 ? '永久有效'
       : (() => {
           const d = new Date(now + expireMs);
           const p = n => String(n).padStart(2, '0');
           return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
         })();
-
     let warnHtml = '';
     if (urlSize > 60000) {
       warnHtml = `<div class="share-hint warn">
@@ -3195,7 +3404,6 @@ async function generateShareLink() {
         建议：把本 HTML 文件放到局域网共享目录，让同事直接打开；或把链接存为 txt 文件发送。
       </div>`;
     }
-
     resultEl.innerHTML = `
       <div style="margin-top:18px;border-top:1px dashed #2a3341;padding-top:14px">
         <div class="share-hint ${password ? 'ok' : 'warn'}">
@@ -3223,9 +3431,7 @@ async function generateShareLink() {
             <span class="v">${sizeStr}</span>
           </div>
         </div>
-
         ${warnHtml}
-
         <div class="share-url-box">
           <textarea id="shareUrlText" readonly>${escapeHtml(shareUrl)}</textarea>
         </div>
@@ -3234,11 +3440,10 @@ async function generateShareLink() {
           <button class="tbtn" id="shareTestBtn">🔍 打开测试</button>
         </div>
         ${password ? `<div class="share-hint info" style="margin-top:10px">
-          ⚠ 请通过<b>不同于链接的渠道</b>把密码告知接收者，例如口头、电话、另一条消息。
+          ⚠ 请通过<b>不同于链接的渠道</b>把密码告知接收者。
         </div>` : ''}
       </div>
     `;
-
     document.getElementById('shareCopyBtn').onclick = () => {
       navigator.clipboard?.writeText(shareUrl).then(
         () => toast('链接已复制到剪贴板'),
@@ -3256,20 +3461,15 @@ async function generateShareLink() {
     </div>`;
   }
 }
-
 document.getElementById('shareClose').onclick = () => shareMask.classList.remove('show');
 document.getElementById('shareOk').onclick = () => shareMask.classList.remove('show');
 shareMask.addEventListener('click', e => { if (e.target === shareMask) shareMask.classList.remove('show'); });
 
-/* =========================================================================
- *  密码输入弹窗
- * ========================================================================= */
 let pwResolve = null;
-
 function openPasswordPrompt(info = {}) {
   return new Promise(resolve => {
     pwResolve = resolve;
-    const { title = '需要密码解密', sharerNote = '', error = '' } = info;
+    const { sharerNote = '', error = '' } = info;
     pwBody.innerHTML = `
       <div class="share-hint info" style="margin-bottom:14px">
         此链接已被加密，请输入分享者提供的访问密码。
@@ -3326,27 +3526,18 @@ pwMask.addEventListener('click', e => {
 async function tryRestoreFromHash() {
   const hash = location.hash || '';
   if (!hash) return false;
-
-  // 匹配 enc= / data= / raw= / gz=
   const m = hash.match(/[#&](enc|data|raw|gz)=([^&]+)/);
   if (!m) return false;
-
   const kind = m[1];
   const encoded = decodeURIComponent(m[2]);
-
   try {
     let json;
-    let meta = null;
-
     if (kind === 'enc') {
-      // 加密链接：提示输入密码
       let pw = await openPasswordPrompt({ sharerNote: '' });
       let attempts = 0;
       while (pw !== null && attempts < 5) {
-        try {
-          json = await decryptWithPassword(encoded, pw);
-          break;
-        } catch (e) {
+        try { json = await decryptWithPassword(encoded, pw); break; }
+        catch (e) {
           attempts++;
           pwMask.classList.remove('show');
           if (attempts >= 5) {
@@ -3359,26 +3550,16 @@ async function tryRestoreFromHash() {
       }
       pwMask.classList.remove('show');
       if (json === undefined) {
-        // 用户取消
         history.replaceState(null, '', location.pathname + location.search);
         return false;
       }
     } else {
       json = await decompressPayload(encoded);
     }
-
     const parsed = JSON.parse(json);
-    // 新格式：{v, meta, data}
     let data, metaInfo = null;
-    if (parsed && parsed.data && parsed.meta) {
-      data = parsed.data;
-      metaInfo = parsed.meta;
-    } else {
-      // 兼容旧格式：直接是节点数据
-      data = parsed;
-    }
-
-    // 校验有效期
+    if (parsed && parsed.data && parsed.meta) { data = parsed.data; metaInfo = parsed.meta; }
+    else { data = parsed; }
     if (metaInfo && metaInfo.expiresAt) {
       if (Date.now() > metaInfo.expiresAt) {
         const d = new Date(metaInfo.expiresAt);
@@ -3393,32 +3574,20 @@ async function tryRestoreFromHash() {
         return false;
       }
     }
-
-    // 加载数据
     if (!data.nodes || !Array.isArray(data.nodes)) throw new Error('数据格式错误');
-
     state.nodes = data.nodes.map(n => ({
-      ...n,
-      note: n.note || '',
-      images: n.images || [],
+      ...n, note: n.note || '', images: n.images || [],
       collapsed: !!n.collapsed,
-      color: n.color || null,
-      rules: n.rules || []
+      bodyCollapsed: !!n.bodyCollapsed,   // ★ 恢复
+      color: n.color || null, rules: n.rules || []
     }));
     state.edges = data.edges || [];
     state.freeMove = !!data.freeMove;
     if (typeof data.autoLayoutOnToggle === 'boolean') autoLayoutOnToggle = data.autoLayoutOnToggle;
-
-    // 只读
-    if (metaInfo && metaInfo.readOnly) {
-      readOnlyMode = true;
-    }
-
+    if (metaInfo && metaInfo.readOnly) readOnlyMode = true;
     render();
     if (data.zoom && data.zoom !== 1) applyZoom(data.zoom);
     applyReadOnlyUI();
-
-    // 展示分享信息
     const metaLine = [];
     if (metaInfo) {
       if (metaInfo.sharerNote) metaLine.push(`📝 ${metaInfo.sharerNote}`);
@@ -3429,9 +3598,7 @@ async function tryRestoreFromHash() {
       }
     }
     if (readOnlyMode) metaLine.push('🔒 只读模式');
-
     toast(`已加载分享数据（${state.nodes.length} 个节点）` + (metaLine.length ? ' · ' + metaLine.join(' · ') : ''));
-
     history.replaceState(null, '', location.pathname + location.search);
     return true;
   } catch (e) {
@@ -3449,11 +3616,7 @@ const importMask = document.getElementById('importMask');
 const importBody = document.getElementById('importBody');
 const importRunBtn = document.getElementById('importRun');
 const importClearFileBtn = document.getElementById('importClearFile');
-
-let importState = {
-  fileName: '', fileSize: 0, parsedRows: [],
-  builtNodes: [], builtEdges: [], errors: [], warnings: [], previewRows: []
-};
+let importState = { fileName: '', fileSize: 0, parsedRows: [], builtNodes: [], builtEdges: [], errors: [], warnings: [], previewRows: [] };
 
 function parseCSV(text) {
   if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
@@ -3493,10 +3656,8 @@ function parseRuleToken(token) {
   m = t.match(/^(序号|seq|S)\s*[:：]\s*(.+)$/i);
   if (m) {
     const parts = m[2].split(/[|｜]/).map(s => s.trim());
-    const value = Number(parts[0]) || 1;
-    const digits = Number(parts[1]) || 2;
-    const auto = parts[2] && /^(自动|auto|是|yes|1|true)$/i.test(parts[2]);
-    return { type: 'seq', value, digits, auto: !!auto };
+    return { type: 'seq', value: Number(parts[0]) || 1, digits: Number(parts[1]) || 2,
+             auto: !!(parts[2] && /^(自动|auto|是|yes|1|true)$/i.test(parts[2])) };
   }
   m = t.match(/^(日期|date|D)\s*[:：]\s*(.*)$/i);
   if (m) return { type: 'date', format: m[2].trim() || 'YYYYMMDD' };
@@ -3545,9 +3706,7 @@ function buildImportData(rows) {
     let ruleTokens = [];
     for (const ci of colMap.rules) {
       const cell = row[ci];
-      if (cell && String(cell).trim()) {
-        ruleTokens.push(...String(cell).split(/[;；]/).map(s => s.trim()).filter(Boolean));
-      }
+      if (cell && String(cell).trim()) ruleTokens.push(...String(cell).split(/[;；]/).map(s => s.trim()).filter(Boolean));
     }
     const rules = ruleTokens.map(parseRuleToken).filter(Boolean);
     entries.push({ rowIdx: i + 1, name, parentRef, baseId, note, rules });
@@ -3558,11 +3717,6 @@ function buildImportData(rows) {
     if (!existingByName.has(n.title)) existingByName.set(n.title, n);
     const id = computeId(n);
     if (id && !existingById.has(id)) existingById.set(id, n);
-  }
-  const nameCount = new Map();
-  for (const e of entries) nameCount.set(e.name, (nameCount.get(e.name) || 0) + 1);
-  for (const [nm, cnt] of nameCount) {
-    if (cnt > 1 && !existingByName.has(nm)) warnings.push({ row: '-', msg: `名称「${nm}」在导入数据中重复 ${cnt} 次` });
   }
   const pending = entries.map(e => ({ ...e, node: null, parent: null }));
   let changed = true, iter = 0;
@@ -3584,7 +3738,9 @@ function buildImportData(rows) {
         id: uid('n'), kind, title: item.name, x: 0, y: 0,
         baseId: kind === 'root' ? (item.baseId || 'AB') : undefined,
         rules: kind === 'rule' ? (item.rules.length ? item.rules : [{ type: 'seq', value: 1, digits: 2, auto: true }]) : undefined,
-        note: item.note || '', images: [], collapsed: false, color: levelColorOf(depth)
+        note: item.note || '', images: [],
+        collapsed: false, bodyCollapsed: false,
+        color: levelColorOf(depth)
       };
       item.node = node; item.parent = parentNode;
       pending.splice(i, 1);
@@ -3608,7 +3764,6 @@ function buildImportData(rows) {
       node: n, name: n.title,
       parentName: n.kind === 'root' ? '' : (parentOf(n.id)?.title || ''),
       id: computeId(n), kind: n.kind,
-      ruleCount: n.rules ? n.rules.length : 0,
       ruleSummary: n.kind === 'rule' ? summarizeRules(n.rules) : '',
       error: null
     }));
@@ -3687,8 +3842,7 @@ function renderImportDialog() {
   }
   html += `<div style="margin:12px 0 6px;font-size:12px;color:#8a97ab">节点预览：</div>
     <div style="max-height:280px;overflow:auto;border:1px solid #2a3341;border-radius:8px;background:#0f141c">`;
-  const showRows = previewRows.slice(0, 150);
-  for (const p of showRows) {
+  for (const p of previewRows.slice(0, 150)) {
     const statusIcon = p.error ? '⚠' : '✓';
     const statusColor = p.error ? '#ffb74d' : '#7ddc9a';
     const parentTxt = p.kind === 'root' ? '（起始节点）' : (p.parentName || '—');
@@ -3732,9 +3886,7 @@ async function handleCSVFile(file) {
     importState.warnings = built.warnings;
     importState.previewRows = built.preview;
     renderImportDialog();
-  } catch (err) {
-    console.error(err); toast('读取文件失败：' + (err.message || err));
-  }
+  } catch (err) { console.error(err); toast('读取文件失败：' + (err.message || err)); }
 }
 function openImportDialog() {
   if (guardReadOnly()) return;
@@ -3797,7 +3949,7 @@ const saveStatusEl = document.getElementById('saveStatus');
 
 function serialize() {
   return JSON.stringify({
-    v: 10,
+    v: 11,
     freeMove: state.freeMove,
     autoLayoutOnToggle,
     zoom,
@@ -3806,7 +3958,9 @@ function serialize() {
       x: n.x, y: n.y,
       baseId: n.baseId, rules: n.rules,
       note: n.note, images: n.images,
-      collapsed: n.collapsed, color: n.color || null
+      collapsed: n.collapsed,
+      bodyCollapsed: n.bodyCollapsed || false,   // ★ 保存两种折叠
+      color: n.color || null
     })),
     edges: state.edges
   }, null, 1);
@@ -3899,7 +4053,9 @@ function loadFromText(text) {
     const data = JSON.parse(text);
     state.nodes = (data.nodes || []).map(n => ({
       ...n, note: n.note || '', images: n.images || [],
-      collapsed: !!n.collapsed, color: n.color || null, rules: n.rules || []
+      collapsed: !!n.collapsed,
+      bodyCollapsed: !!n.bodyCollapsed,   // ★ 恢复
+      color: n.color || null, rules: n.rules || []
     }));
     state.edges = data.edges || [];
     setFreeMove(!!data.freeMove, true);
@@ -3936,7 +4092,8 @@ document.getElementById('btnRoot').onclick = () => {
     x: 80 + (count % 3) * 380,
     y: 80 + Math.floor(count / 3) * 260,
     baseId: 'AB',
-    note: '', images: [], collapsed: false,
+    note: '', images: [],
+    collapsed: false, bodyCollapsed: false,
     color: levelColorOf(0)
   };
   state.nodes.push(node);
@@ -3963,7 +4120,6 @@ async function init() {
   updateZoomDisplay();
   updateAutoToggleBtn();
 
-  // 1) 优先尝试从 URL hash 恢复（分享链接）
   const fromHash = await tryRestoreFromHash();
   if (fromHash) {
     setFreeMove(state.freeMove, true);
@@ -3975,7 +4131,6 @@ async function init() {
     return;
   }
 
-  // 2) 从本地缓存恢复
   const raw = localStorage.getItem('order-node-app');
   let restored = false;
   if (raw) {
@@ -3984,7 +4139,9 @@ async function init() {
       if (data.nodes?.length) {
         state.nodes = data.nodes.map(n => ({
           ...n, note: n.note || '', images: n.images || [],
-          collapsed: !!n.collapsed, color: n.color || null, rules: n.rules || []
+          collapsed: !!n.collapsed,
+          bodyCollapsed: !!n.bodyCollapsed,
+          color: n.color || null, rules: n.rules || []
         }));
         state.edges = data.edges || [];
         state.freeMove = !!data.freeMove;
@@ -3993,29 +4150,33 @@ async function init() {
         if (data.zoom && data.zoom !== 1) {
           zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, data.zoom));
           canvas.style.transform = `scale(${zoom})`;
-          updateZoomWrap();
-          updateZoomDisplay();
+          updateZoomWrap(); updateZoomDisplay();
         }
       }
     } catch (e) {}
   }
 
-  // 3) 默认示例
   if (!restored) {
     const root = {
       id: uid('n'), kind: 'root', title: '产品族',
       x: 120, y: 200, baseId: 'AB',
-      note: '', images: [], collapsed: false, color: levelColorOf(0)
+      note: '', images: [],
+      collapsed: false, bodyCollapsed: false,
+      color: levelColorOf(0)
     };
     const c1 = {
       id: uid('n'), kind: 'rule', title: '子产品 A', x: 490, y: 100,
       rules: [{ type: 'seq', value: 1, digits: 2, auto: true }],
-      note: '', images: [], collapsed: false, color: levelColorOf(1)
+      note: '', images: [],
+      collapsed: false, bodyCollapsed: false,
+      color: levelColorOf(1)
     };
     const c2 = {
       id: uid('n'), kind: 'rule', title: '子产品 B', x: 490, y: 360,
       rules: [{ type: 'seq', value: 1, digits: 2, auto: true }],
-      note: '', images: [], collapsed: false, color: levelColorOf(1)
+      note: '', images: [],
+      collapsed: false, bodyCollapsed: false,
+      color: levelColorOf(1)
     };
     state.nodes.push(root, c1, c2);
     state.edges.push(
