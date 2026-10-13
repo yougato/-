@@ -118,6 +118,9 @@
 
   /* ---------- 画布 ---------- */
   .stage{ flex:1; overflow:auto; position:relative; }
+  /* ★ 中键平移画布：拖动期间显示抓手光标并禁止选中文本 */
+  body.canvas-panning,
+  body.canvas-panning *{ cursor: grabbing !important; user-select: none !important; }
   .stage::-webkit-scrollbar{ width:12px; height:12px; }
   .stage::-webkit-scrollbar-thumb{ background:#2a3341; border-radius:6px; }
   .stage::-webkit-scrollbar-track{ background:#0a0d12; }
@@ -2545,6 +2548,58 @@ function startBoxSelect(e) {
 }
 
 /* =========================================================================
+ *  ★ 中键平移画布
+ * ========================================================================= */
+let panning = false;
+
+function startPan(e) {
+  e.preventDefault();
+  if (panning) return;
+  hidePathTooltip();
+  closeCtxMenu();
+
+  panning = true;
+  document.body.classList.add('canvas-panning');
+
+  const pid = e.pointerId;
+  const startX = e.clientX, startY = e.clientY;
+  const startScrollLeft = stage.scrollLeft, startScrollTop = stage.scrollTop;
+  // 指针捕获：即使拖到窗口外也能持续收到 move/up
+  try { stage.setPointerCapture(pid); } catch (err) {}
+  let moved = false;
+
+  const finish = () => {
+    panning = false;
+    document.body.classList.remove('canvas-panning');
+    document.removeEventListener('pointermove', move);
+    document.removeEventListener('pointerup', finish);
+    document.removeEventListener('pointercancel', finish);
+    window.removeEventListener('blur', finish);
+    try { stage.releasePointerCapture(pid); } catch (err) {}
+  };
+
+  const move = ev => {
+    if (ev.pointerId !== pid) return;
+    if (!(ev.buttons & 4)) { finish(); return; }   // 中键已在窗口外松开
+    const dx = ev.clientX - startX;
+    const dy = ev.clientY - startY;
+    if (!moved && Math.abs(dx) < 2 && Math.abs(dy) < 2) return;  // 过滤轻微抖动
+    moved = true;
+    stage.scrollLeft = startScrollLeft - dx;
+    stage.scrollTop  = startScrollTop - dy;
+  };
+
+  document.addEventListener('pointermove', move);
+  document.addEventListener('pointerup', finish);
+  document.addEventListener('pointercancel', finish);
+  window.addEventListener('blur', finish);
+}
+
+/* 中键默认会触发「自动滚动」与辅助点击，这里统一屏蔽 */
+stage.addEventListener('mousedown', e => { if (e.button === 1) e.preventDefault(); });
+stage.addEventListener('auxclick', e => { if (e.button === 1) e.preventDefault(); });
+
+/* =========================================================================
  *  路径提示
  * ========================================================================= */
 const pathTooltipEl = document.getElementById('pathTooltip');
@@ -2761,6 +2816,7 @@ function connect(fromId, toId) {
  *  画布交互（含批量拖动 + 对齐辅助线）
  * ========================================================================= */
 canvas.addEventListener('pointerdown', e => {
+  if (e.button === 1) { startPan(e); return; }  // 中键：拖动画布（不受只读模式限制）
   if (e.button === 2) return;  // 右键交给 contextmenu
   hidePathTooltip();
   closeCtxMenu();
@@ -4986,7 +5042,7 @@ const ONBOARD_STEPS = [
   {
     icon: '⚡',
     title: '效率操作',
-    desc: '· <b>框选</b>：空白处拖动鼠标，可批量选择节点<br>· <kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>Ctrl</kbd>+<kbd>V</kbd>：复制粘贴节点<br>· <kbd>Alt</kbd> + 悬停：快速预览节点截图<br>· <kbd>Ctrl</kbd>+<kbd>Z</kbd>：撤销上一步操作<br>· 拖动时自动显示<strong>对齐辅助线</strong>'
+    desc: '· <b>框选</b>：空白处拖动鼠标，可批量选择节点<br>· <kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>Ctrl</kbd>+<kbd>V</kbd>：复制粘贴节点<br>· <kbd>Alt</kbd> + 悬停：快速预览节点截图<br>· <kbd>Ctrl</kbd>+<kbd>Z</kbd>：撤销上一步操作<br>· 拖动时自动显示<strong>对齐辅助线</strong><br>· <b>中键拖动</b>：像地图一样平移画布视图'
   },
   {
     icon: '✅',
