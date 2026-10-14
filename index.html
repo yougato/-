@@ -57,6 +57,8 @@
   .tbtn.imp:hover{ border-color:var(--gold); background:rgba(224,166,58,.2); }
   .tbtn.dash{ border-color:#7a4ab8; color:#c9a6f0; background:rgba(178,90,214,.1); }
   .tbtn.dash:hover{ border-color:#b25ad6; background:rgba(178,90,214,.22); }
+  .tbtn.mind{ border-color:#2f7f8e; color:#8fd8e6; background:rgba(58,168,186,.1); }
+  .tbtn.mind:hover{ border-color:#3ab0c4; background:rgba(58,168,186,.22); }
   .tbtn:disabled{ opacity:.35; cursor:not-allowed; }
   .spacer{ flex:1; }
 
@@ -115,6 +117,7 @@
     opacity: .55;
   }
   body.readonly-mode .node .port{ opacity: .3; }
+  body.readonly-mode .node .batch-title{ pointer-events: none !important; opacity: .7; }
   body.readonly-mode .node .node-head{ cursor: default !important; }
 
   /* ---------- 画布 ---------- */
@@ -353,6 +356,51 @@
   .node.body-collapsed .img-count-badge.has-content{ display:inline-block; }
   .node.collapsed .subtree-badge.has-content,
   .node.body-collapsed .subtree-badge.has-content{ display:inline-block; }
+
+  /* ---------- ★ 批号（台账） ---------- */
+  .batch-badge{
+    display:none;
+    font-size:10px; padding:1px 5px; border-radius:9px;
+    font-family:ui-monospace,monospace;
+    margin-left:1px; flex:none; line-height:1.4; white-space:nowrap;
+    background:rgba(63,185,107,.18); color:#a6efb8;
+    border:1px solid rgba(63,185,107,.4);
+  }
+  .node.collapsed .batch-badge.has-content,
+  .node.body-collapsed .batch-badge.has-content{ display:inline-block; }
+
+  .batch-area{
+    background:#0f141c; border:1px solid var(--border); border-radius:8px;
+    padding:6px 8px; display:flex; flex-direction:column; gap:5px;
+  }
+  .batch-head{ display:flex; align-items:center; gap:6px; }
+  .batch-title{
+    flex:1; min-width:0; text-align:left; background:transparent; border:none;
+    color:#a9b8cf; font-size:11.5px; cursor:pointer; padding:1px 0;
+    font-family:inherit; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .batch-title:hover{ color:var(--accent); }
+  .batch-title b{ color:#a6efb8; font-family:ui-monospace,monospace; }
+  .batch-title .batch-warn{ color:#ff9d9d; }
+  .batch-mini{
+    display:grid; grid-template-columns: 1fr auto auto; gap:6px; align-items:baseline;
+    font-size:11px; font-family:ui-monospace,monospace; color:#8a97ab;
+  }
+  .batch-mini .b-no{ color:var(--gold); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .batch-mini.dup .b-no{ color:#ff8b8b; }
+  .batch-more{ font-size:10.5px; color:#6f7c90; }
+
+  /* 批号管理面板 */
+  .batch-hint{ font-size:11.5px; color:var(--muted); }
+  .batch-hint.bad{ color:#ff8b8b; }
+  .batch-table{ display:flex; flex-direction:column; gap:8px; }
+  .batch-cols{
+    display:grid; grid-template-columns:1.3fr 86px 124px 1.6fr 30px; gap:8px;
+    font-size:11px; color:var(--muted); padding:0 1px;
+  }
+  .batch-line{ display:grid; grid-template-columns:1.3fr 86px 124px 1.6fr 30px; gap:8px; align-items:center; }
+  .batch-line.dup .r-input{ border-color:var(--danger); }
+  .batch-empty{ padding:22px 10px; text-align:center; color:var(--muted); font-size:12.5px; }
 
   .port{
     position:absolute; width:13px; height:13px; border-radius:50%;
@@ -625,7 +673,7 @@
 
   .export-table{ font-size:12.5px; }
   .et-row{
-    display:grid; grid-template-columns:1fr 158px 54px 78px; gap:10px;
+    display:grid; grid-template-columns:1fr 158px 54px 54px 78px; gap:10px;
     padding:7px 3px; border-bottom:1px dashed #222a36; align-items:baseline;
   }
   .et-row.head{
@@ -925,6 +973,7 @@
   <button class="tbtn" id="btnLevelColor">🎨 层级配色</button>
   <button class="tbtn dash" id="btnDashboard">📊 数据看板</button>
   <button class="tbtn success" id="btnExport">📈 导出 Excel</button>
+  <button class="tbtn mind" id="btnExportMind" title="导出为 XMind 脑图（.xmind，包含折叠的子节点）">🧠 导出脑图</button>
   <button class="tbtn imp" id="btnImport">📥 CSV 导入</button>
 
   <div class="search-box">
@@ -996,6 +1045,23 @@
       <button class="tbtn" id="modalDlCsv" style="display:none">⬇ CSV</button>
       <button class="tbtn" id="modalCopy">复制全部</button>
       <button class="tbtn" id="modalOk">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- ★ 批号管理 -->
+<div class="modal-mask" id="batchMask">
+  <div class="modal wide">
+    <div class="modal-head">
+      <span id="batchTitle">🏷 批号管理</span>
+      <button class="icon-btn" id="batchClose">✕</button>
+    </div>
+    <div class="modal-body" id="batchBody"></div>
+    <div class="modal-foot">
+      <span class="batch-hint" id="batchHint"></span>
+      <div class="spacer"></div>
+      <button class="tbtn success" id="batchAdd">＋ 添加批号</button>
+      <button class="tbtn" id="batchOk">关闭</button>
     </div>
   </div>
 </div>
@@ -1215,7 +1281,7 @@ function updateUndoRedoBtns() {
 
 function takeSnapshot() {
   return JSON.stringify({
-    v: 13,
+    v: 14,
     freeMove: state.freeMove,
     autoLayoutOnToggle,
     zoom,
@@ -1224,6 +1290,7 @@ function takeSnapshot() {
       x: n.x, y: n.y,
       baseId: n.baseId, rules: n.rules,
       note: n.note, images: n.images,
+      batches: n.batches || [],
       collapsed: n.collapsed,
       bodyCollapsed: n.bodyCollapsed || false,
       color: n.color || null
@@ -1282,6 +1349,7 @@ function applySnapshot(str) {
       ...n,
       note: n.note || '',
       images: n.images || [],
+      batches: n.batches || [],
       collapsed: !!n.collapsed,
       bodyCollapsed: !!n.bodyCollapsed,
       color: n.color || null,
@@ -2085,6 +2153,198 @@ function toggleSubtreeCollapse(node) {
 }
 
 /* =========================================================================
+ *  ★ 批号（台账：不参与订货号计算）
+ * ========================================================================= */
+const BATCH_PREVIEW = 2;      // 节点内最多预览几条，避免把节点撑高
+let batchDupCache = null;
+let batchPanelNode = null;
+
+const batchMask = document.getElementById('batchMask');
+const batchBody = document.getElementById('batchBody');
+const batchHint = document.getElementById('batchHint');
+
+function batchesOf(node) {
+  if (!Array.isArray(node.batches)) node.batches = [];
+  return node.batches;
+}
+function invalidateBatchDup() { batchDupCache = null; }
+/** 批号重复集合（带缓存，render / markDirty 时失效） */
+function batchDuplicates() {
+  if (!batchDupCache) batchDupCache = checkBatchDuplicates();
+  return batchDupCache;
+}
+/** 批号在追溯语境下应唯一，跨节点重复同样算重复 */
+function checkBatchDuplicates() {
+  const seen = new Set(), dup = new Set();
+  for (const n of state.nodes) {
+    for (const b of (n.batches || [])) {
+      const no = String(b.no || '').trim();
+      if (!no) continue;
+      if (seen.has(no)) dup.add(no); else seen.add(no);
+    }
+  }
+  return dup;
+}
+function nodeHasDupBatch(node, dupSet) {
+  return batchesOf(node).some(b => dupSet.has(String(b.no || '').trim()));
+}
+/** 只预填一个建议批号，不做规则引擎 */
+function suggestBatchNo(node) {
+  const d = new Date();
+  const p = n => String(n).padStart(2, '0');
+  const base = `L${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}`;
+  const used = new Set(batchesOf(node).map(b => String(b.no || '')));
+  let i = 1;
+  while (used.has(`${base}-${p(i)}`)) i++;
+  return `${base}-${p(i)}`;
+}
+function todayIso() {
+  const d = new Date();
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+/* ---------- 节点内的批号摘要区 ---------- */
+function buildBatchArea(node) {
+  const list = batchesOf(node);
+  const dupSet = batchDuplicates();
+  const hasDup = nodeHasDupBatch(node, dupSet);
+
+  const wrap = el('div', 'batch-area');
+  const head = el('div', 'batch-head');
+  const title = el('button', 'batch-title');
+  title.type = 'button';
+  title.innerHTML = list.length
+    ? `🏷 批号 <b>${list.length}</b>${hasDup ? ' <span class="batch-warn">⚠ 重复</span>' : ''}`
+    : '🏷 批号 <b>0</b> · 点击添加';
+  title.title = '管理批号（数量 / 日期 / 备注）';
+  title.onclick = ev => { ev.stopPropagation(); openBatchPanel(node); };
+  head.appendChild(title);
+  wrap.appendChild(head);
+
+  // 没有批号时只留标题行，避免每个节点都白白变高
+  if (!list.length) return wrap;
+  for (const b of list.slice(-BATCH_PREVIEW).reverse()) {
+    const no = String(b.no || '').trim();
+    const row = el('div', 'batch-mini' + (dupSet.has(no) ? ' dup' : ''));
+    row.append(
+      el('span', 'b-no', no || '（未命名）'),
+      el('span', null, b.qty ? String(b.qty) : '—'),
+      el('span', null, b.date ? String(b.date).slice(5) : '')
+    );
+    wrap.appendChild(row);
+  }
+  if (list.length > BATCH_PREVIEW) {
+    wrap.appendChild(el('div', 'batch-more', `共 ${list.length} 批 · 点击上方管理全部`));
+  }
+  return wrap;
+}
+
+/* ---------- 批号管理面板 ---------- */
+function openBatchPanel(node) {
+  if (guardReadOnly()) return;
+  batchPanelNode = node;
+  renderBatchPanel();
+  batchMask.classList.add('show');
+}
+function closeBatchPanel() {
+  if (!batchMask.classList.contains('show')) return;
+  batchMask.classList.remove('show');
+  batchPanelNode = null;
+  invalidateBatchDup();
+  render();                 // 让节点内的批号摘要 / 徽标跟上
+}
+function renderBatchPanel() {
+  const node = batchPanelNode;
+  if (!node) return;
+  const list = batchesOf(node);
+  const dupSet = checkBatchDuplicates();
+  document.getElementById('batchTitle').innerHTML =
+    `🏷 批号管理 · <span style="color:#ffb74d">${escapeHtml(node.title || '未命名')}</span>`;
+
+  batchBody.innerHTML = '';
+  if (!list.length) {
+    batchBody.appendChild(el('div', 'batch-empty', '还没有批号，点击右下角「＋ 添加批号」开始记录。'));
+  } else {
+    const cols = el('div', 'batch-cols');
+    cols.append(el('span', null, '批号'), el('span', null, '数量'),
+                el('span', null, '日期'), el('span', null, '备注'), el('span'));
+    const table = el('div', 'batch-table');
+    table.appendChild(cols);
+    list.forEach(b => table.appendChild(buildBatchLine(node, b, dupSet)));
+    batchBody.appendChild(table);
+  }
+  updateBatchHint(node, dupSet);
+}
+function updateBatchHint(node, dupSet) {
+  const list = batchesOf(node);
+  const dupCount = list.filter(b => dupSet.has(String(b.no || '').trim())).length;
+  batchHint.textContent = dupCount
+    ? `⚠ ${dupCount} 条批号与其他节点重复（批号建议全局唯一）`
+    : `共 ${list.length} 条批号`;
+  batchHint.className = 'batch-hint' + (dupCount ? ' bad' : '');
+}
+/** 改「批号」时只刷新重复标记，不重建面板（重建会让输入框失去焦点） */
+function refreshBatchDupMarks() {
+  const node = batchPanelNode;
+  if (!node) return;
+  invalidateBatchDup();
+  const dupSet = batchDuplicates();
+  const lines = batchBody.querySelectorAll('.batch-line');
+  batchesOf(node).forEach((b, i) => {
+    const line = lines[i];
+    if (line) line.classList.toggle('dup', dupSet.has(String(b.no || '').trim()));
+  });
+  updateBatchHint(node, dupSet);
+}
+function buildBatchLine(node, b, dupSet) {
+  const no = String(b.no || '').trim();
+  const line = el('div', 'batch-line' + (dupSet.has(no) ? ' dup' : ''));
+
+  const inpNo = el('input', 'r-input');
+  inpNo.type = 'text'; inpNo.value = b.no || ''; inpNo.placeholder = '如 L20261013-01';
+  const inpQty = el('input', 'r-input');
+  inpQty.type = 'number'; inpQty.value = b.qty ?? ''; inpQty.min = 0; inpQty.placeholder = '0';
+  const inpDate = el('input', 'r-input');
+  inpDate.type = 'date'; inpDate.value = b.date || '';
+  const inpNote = el('input', 'r-input');
+  inpNote.type = 'text'; inpNote.value = b.note || ''; inpNote.placeholder = '客户 / 工序 / 说明';
+
+  inpNo.oninput    = () => { b.no = inpNo.value; markDirty(); refreshBatchDupMarks(); };
+  inpQty.oninput   = () => { b.qty = Number(inpQty.value) || 0; markDirty(); };
+  inpDate.onchange = () => { b.date = inpDate.value; markDirty(); };
+  inpNote.oninput  = () => { b.note = inpNote.value; markDirty(); };
+  [inpNo, inpQty, inpDate, inpNote].forEach(attachUndoToInput);
+
+  const del = el('button', 'icon-btn del', '✕');
+  del.title = '删除该批号';
+  del.onclick = ev => {
+    ev.stopPropagation();
+    pushUndo();
+    const i = batchesOf(node).indexOf(b);
+    if (i > -1) node.batches.splice(i, 1);
+    markDirty(); renderBatchPanel();
+  };
+  line.append(inpNo, inpQty, inpDate, inpNote, del);
+  return line;
+}
+
+document.getElementById('batchAdd').onclick = () => {
+  const node = batchPanelNode;
+  if (!node || guardReadOnly()) return;
+  pushUndo();
+  batchesOf(node).push({ id: uid('b'), no: suggestBatchNo(node), qty: 0, date: todayIso(), note: '' });
+  markDirty();
+  renderBatchPanel();
+  const inputs = batchBody.querySelectorAll('.batch-line input');
+  const first = inputs[inputs.length - 4];
+  if (first) { first.focus(); first.select(); }
+};
+document.getElementById('batchClose').onclick = closeBatchPanel;
+document.getElementById('batchOk').onclick = closeBatchPanel;
+batchMask.addEventListener('click', e => { if (e.target === batchMask) closeBatchPanel(); });
+
+/* =========================================================================
  *  节点渲染
  * ========================================================================= */
 let activeNodeId = null;
@@ -2127,6 +2387,8 @@ function buildNodeEl(node) {
 
   const imgBadge = el('span', 'img-count-badge' + (hasImages ? ' has-content' : ''), hasImages ? `📷${node.images.length}` : '');
   const subBadge = el('span', 'subtree-badge' + (childCount > 0 ? ' has-content' : ''), childCount > 0 ? `+${childCount}` : '');
+  const batchCount = batchesOf(node).length;
+  const batchBadge = el('span', 'batch-badge' + (batchCount ? ' has-content' : ''), batchCount ? `🏷${batchCount}` : '');
 
   const colorBtn = el('button', 'color-dot');
   colorBtn.title = '更改节点颜色';
@@ -2141,7 +2403,7 @@ function buildNodeEl(node) {
   delBtn.title = '删除节点（含其所有子节点）';
   delBtn.onclick = ev => { ev.stopPropagation(); if (guardReadOnly()) return; removeNode(node.id); };
 
-  head.append(chev, subtreeChev, title, imgBadge, subBadge, colorBtn, addBtn, delBtn);
+  head.append(chev, subtreeChev, title, imgBadge, subBadge, batchBadge, colorBtn, addBtn, delBtn);
   wrap.appendChild(head);
 
   const body = el('div', 'node-body');
@@ -2232,6 +2494,9 @@ function buildNodeEl(node) {
   rebuildGallery();
   body.appendChild(gallery);
 
+  // ★ 批号台账（不参与订货号计算）
+  body.appendChild(buildBatchArea(node));
+
   wrap.appendChild(body);
 
   const outPort = el('div', 'port out');
@@ -2304,6 +2569,7 @@ function syncViewport() {
  *  整体渲染
  * ========================================================================= */
 function render() {
+  invalidateBatchDup();
   visibleSet = computeVisible();
   // 清空所有节点
   canvas.querySelectorAll('.node').forEach(n => n.remove());
@@ -2484,6 +2750,7 @@ function copySelectedNodes() {
       rules: n.rules ? JSON.parse(JSON.stringify(n.rules)) : undefined,
       note: n.note || '',
       images: n.images ? [...n.images] : [],
+      batches: n.batches ? JSON.parse(JSON.stringify(n.batches)) : [],
       collapsed: !!n.collapsed,
       bodyCollapsed: !!n.bodyCollapsed,
       color: n.color || null,
@@ -2524,6 +2791,8 @@ function pasteNodes() {
       rules: item.rules ? JSON.parse(JSON.stringify(item.rules)) : undefined,
       note: item.note || '',
       images: item.images ? [...item.images] : [],
+      // 批号随节点复制，但 id 必须重新生成，避免两份数据撞 id
+      batches: (item.batches || []).map(b => ({ ...b, id: uid('b') })),
       collapsed: !!item.collapsed,
       bodyCollapsed: !!item.bodyCollapsed,
       color: item.color || null
@@ -2810,7 +3079,7 @@ function addChild(parent) {
     id: uid('n'), kind: 'rule', title: '子产品',
     x: parent.x + 340, y: parent.y,
     rules: [{ type: 'seq', value: 1, digits: 2, auto: true }],
-    note: '', images: [],
+    note: '', images: [], batches: [],
     collapsed: false, bodyCollapsed: false,
     color: levelColorOf(newDepth)
   };
@@ -3309,6 +3578,10 @@ canvas.addEventListener('contextmenu', e => {
  * ========================================================================= */
 document.addEventListener('keydown', e => {
   if (ivState.open) return;
+  if (batchMask.classList.contains('show')) {
+    if (e.key === 'Escape') { e.preventDefault(); closeBatchPanel(); }
+    return;
+  }
   if (modalMask.classList.contains('show')) return;
   if (importMask.classList.contains('show')) return;
   if (shareMask.classList.contains('show')) return;
@@ -3775,7 +4048,7 @@ function crc32(buf) {
   for (let i = 0; i < buf.length; i++) c = CRC_TABLE[(c ^ buf[i]) & 0xFF] ^ (c >>> 8);
   return (c ^ 0xFFFFFFFF) >>> 0;
 }
-function zipStore(files) {
+function zipStore(files, mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
   const enc = new TextEncoder();
   const parts = [], central = [];
   let offset = 0;
@@ -3825,9 +4098,7 @@ function zipStore(files) {
   dv3.setUint32(12, centralSize, true);
   dv3.setUint32(16, offset, true);
   dv3.setUint16(20, 0, true);
-  return new Blob([...parts, ...central, eocd], {
-    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-  });
+  return new Blob([...parts, ...central, eocd], { type: mimeType });
 }
 function xmlEsc(s) {
   return String(s).replace(/[&<>"']/g, c => ({
@@ -3919,6 +4190,114 @@ function todayStamp() {
 }
 
 /* =========================================================================
+ *  ★ 导出 XMind 脑图（.xmind 就是一个 zip 包）
+ *    同时写入新格式 content.json 与旧格式 content.xml，兼顾不同 XMind 版本
+ * ========================================================================= */
+let mindIdSeq = 0;
+function nextMindId() {
+  return 't' + Date.now().toString(36) + (mindIdSeq++).toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
+/** 节点树 → 脑图主题树（含折叠的子级；同级按 y/x 排序） */
+function buildMindTopics() {
+  const visited = new Set();
+  const toTopic = n => {
+    if (!n || visited.has(n.id)) return null;
+    visited.add(n.id);
+    const code = computeId(n);
+    const t = {
+      id: nextMindId(),
+      title: n.title || '未命名',
+      note: code ? `订货号：${code}` : (n.kind === 'root' ? '' : '未连接'),
+      children: []
+    };
+    for (const k of kidsOfNode(n)) {
+      const c = toTopic(k);
+      if (c) t.children.push(c);
+    }
+    return t;
+  };
+  const trees = rootNodes().map(toTopic).filter(Boolean);
+  // 兜底：数据异常（环 / 游离）时把没走到的节点也带上
+  for (const n of state.nodes) {
+    if (visited.has(n.id)) continue;
+    const t = toTopic(n);
+    if (t) trees.push(t);
+  }
+  if (!trees.length) return null;
+  if (trees.length === 1) return trees[0];
+  return { id: nextMindId(), title: '订货号', note: '', children: trees };
+}
+
+/** 新格式（XMind Zen / 2020+）：content.json 的 topic */
+function mindTopicToJson(t) {
+  const o = { id: t.id, class: 'topic', title: t.title };
+  if (t.note) o.notes = { plain: { content: t.note } };
+  if (t.children.length) o.children = { attached: t.children.map(mindTopicToJson) };
+  return o;
+}
+/** 旧格式（XMind 8 及更早）：content.xml 的 topic */
+function mindTopicToXml(t, depth) {
+  const pad = '  '.repeat(depth);
+  let s = `${pad}<topic id="${xmlEsc(t.id)}">\n`;
+  s += `${pad}  <title>${xmlEsc(t.title)}</title>\n`;
+  if (t.note) s += `${pad}  <notes><plain>${xmlEsc(t.note)}</plain></notes>\n`;
+  if (t.children.length) {
+    s += `${pad}  <children>\n${pad}    <topics type="attached">\n`;
+    s += t.children.map(c => mindTopicToXml(c, depth + 3)).join('');
+    s += `${pad}    </topics>\n${pad}  </children>\n`;
+  }
+  s += `${pad}</topic>\n`;
+  return s;
+}
+
+function exportXmind() {
+  if (!state.nodes.length) return toast('还没有任何节点');
+  const tree = buildMindTopics();
+  if (!tree) return toast('没有可导出的节点');
+  try {
+    const sheetId = nextMindId();
+    const sheetTitle = '订货号';
+    const contentJson = JSON.stringify([{
+      id: sheetId, class: 'sheet', title: sheetTitle,
+      rootTopic: mindTopicToJson(tree)
+    }]);
+    const metadataJson = JSON.stringify({
+      creator: { name: '订货号生成器', version: '1.0' },
+      activeSheetId: sheetId
+    });
+    const manifestJson = JSON.stringify({
+      'file-entries': { 'content.json': {}, 'metadata.json': {} }
+    });
+    const contentXml = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n'
+      + '<xmap-content xmlns="urn:xmind:xmap:xmlns:content:2.0" version="2.0">\n'
+      + `  <sheet id="${xmlEsc(sheetId)}">\n`
+      + mindTopicToXml(tree, 2)
+      + `    <title>${xmlEsc(sheetTitle)}</title>\n`
+      + '  </sheet>\n</xmap-content>\n';
+    const metaManifest = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n'
+      + '<manifest xmlns="urn:xmind:xmap:xmlns:manifest:1.0">\n'
+      + '  <file-entry full-path="content.xml" media-type="text/xml"/>\n'
+      + '  <file-entry full-path="META-INF/" media-type=""/>\n'
+      + '  <file-entry full-path="META-INF/manifest.xml" media-type="text/xml"/>\n'
+      + '</manifest>\n';
+
+    const blob = zipStore([
+      { name: 'content.json',        data: contentJson },
+      { name: 'metadata.json',       data: metadataJson },
+      { name: 'manifest.json',       data: manifestJson },
+      { name: 'content.xml',         data: contentXml },
+      { name: 'META-INF/manifest.xml', data: metaManifest }
+    ], 'application/x-xmind');
+    downloadBlob(blob, `订货号脑图_${todayStamp()}.xmind`);
+    toast(`已导出 XMind 脑图（${state.nodes.length} 个节点 · 含折叠子级）`);
+  } catch (err) {
+    toast('导出脑图失败：' + (err.message || err));
+  }
+}
+document.getElementById('btnExportMind').onclick = exportXmind;
+
+/* =========================================================================
  *  导出数据收集
  * ========================================================================= */
 function collectExportData() {
@@ -3938,6 +4317,7 @@ function collectExportData() {
       parentName: p ? (p.title || '') : '—',
       note: n.note || '', status,
       imageCount: (n.images || []).length,
+      batchCount: (n.batches || []).length,
       isLeaf: !state.edges.some(e => e.from === n.id),
       isRoot: n.kind === 'root'
     };
@@ -3946,8 +4326,8 @@ function collectExportData() {
 function buildSheetRows() {
   const rows = collectExportData();
   return [
-    ['订货号', '产品名称', '层级', '父节点', '备注', '截图数', '状态', '是否成品'],
-    ...rows.map(r => [r.id, r.name, String(r.depth), r.parentName, r.note, String(r.imageCount), r.status, r.isLeaf ? '是' : ''])
+    ['订货号', '产品名称', '层级', '父节点', '备注', '截图数', '批号数', '状态', '是否成品'],
+    ...rows.map(r => [r.id, r.name, String(r.depth), r.parentName, r.note, String(r.imageCount), String(r.batchCount || 0), r.status, r.isLeaf ? '是' : ''])
   ];
 }
 
@@ -3992,7 +4372,7 @@ document.getElementById('btnExport').onclick = () => {
   const headHtml = `
     <div class="et-row head">
       <span>订货号</span><span>产品名称</span>
-      <span class="et-lv">层级</span><span class="et-st">状态</span>
+      <span class="et-lv">层级</span><span class="et-lv">批号</span><span class="et-st">状态</span>
     </div>`;
   const bodyHtml = rows.map(r => {
     const idCls = r.status === '同级重复' ? ' bad'
@@ -4003,6 +4383,7 @@ document.getElementById('btnExport').onclick = () => {
       <span class="et-id${idCls}">${escapeHtml(r.id)}</span>
       <span class="et-name" title="${escapeHtml(r.name)}">${escapeHtml(r.name)}</span>
       <span class="et-lv">${r.depth}</span>
+      <span class="et-lv">${r.batchCount || 0}</span>
       <span class="et-st ${stCls}">${escapeHtml(r.status)}</span>
     </div>`;
   }).join('');
@@ -4017,7 +4398,7 @@ document.getElementById('btnExport').onclick = () => {
     showCopy: true, showDownload: true,
     onXlsx: () => {
       try {
-        downloadBlob(buildXlsxBlob(buildSheetRows(), [30, 24, 8, 24, 40, 8, 12, 10]), `订货号_${todayStamp()}.xlsx`);
+        downloadBlob(buildXlsxBlob(buildSheetRows(), [30, 24, 8, 24, 40, 8, 8, 12, 10]), `订货号_${todayStamp()}.xlsx`);
         toast('已生成 Excel 文件');
       } catch (err) { toast('生成 Excel 失败：' + (err.message || err)); }
     },
@@ -4146,7 +4527,7 @@ document.getElementById('dashFit').onclick = () => {
 };
 document.getElementById('dashExportXlsx').onclick = () => {
   try {
-    downloadBlob(buildXlsxBlob(buildSheetRows(), [30, 24, 8, 24, 40, 8, 12, 10]), `订货号_${todayStamp()}.xlsx`);
+    downloadBlob(buildXlsxBlob(buildSheetRows(), [30, 24, 8, 24, 40, 8, 8, 12, 10]), `订货号_${todayStamp()}.xlsx`);
     toast('已导出 Excel');
   } catch (err) { toast('导出失败：' + (err.message || err)); }
 };
@@ -4287,6 +4668,7 @@ function stripImagesForShare() {
       x: n.x, y: n.y,
       baseId: n.baseId, rules: n.rules,
       note: n.note, images: [],
+      batches: n.batches || [],
       collapsed: n.collapsed,
       bodyCollapsed: n.bodyCollapsed || false,
       color: n.color || null
@@ -4378,7 +4760,7 @@ async function generateShareLink() {
   try {
     const now = Date.now();
     const payload = {
-      v: 13,
+      v: 14,
       meta: {
         createdAt: now,
         expiresAt: expireMs > 0 ? now + expireMs : null,
@@ -4587,6 +4969,7 @@ async function tryRestoreFromHash() {
     if (!data.nodes || !Array.isArray(data.nodes)) throw new Error('数据格式错误');
     state.nodes = data.nodes.map(n => ({
       ...n, note: n.note || '', images: n.images || [],
+      batches: n.batches || [],
       collapsed: !!n.collapsed,
       bodyCollapsed: !!n.bodyCollapsed,
       color: n.color || null, rules: n.rules || []
@@ -4748,7 +5131,7 @@ function buildImportData(rows) {
         id: uid('n'), kind, title: item.name, x: 0, y: 0,
         baseId: kind === 'root' ? (item.baseId || 'AB') : undefined,
         rules: kind === 'rule' ? (item.rules.length ? item.rules : [{ type: 'seq', value: 1, digits: 2, auto: true }]) : undefined,
-        note: item.note || '', images: [],
+        note: item.note || '', images: [], batches: [],
         collapsed: false, bodyCollapsed: false,
         color: levelColorOf(depth)
       };
@@ -5030,6 +5413,7 @@ function updateSaveStatus() {
 }
 function markDirty() {
   if (readOnlyMode) return;
+  invalidateBatchDup();
   fileDirty = true;
   updateSaveStatus();
   clearTimeout(autoSaveTimer);
@@ -5107,6 +5491,7 @@ function loadFromText(text, opts = {}) {
     if (!data || typeof data !== 'object') throw new Error('数据格式错误');
     state.nodes = (data.nodes || []).map(n => ({
       ...n, note: n.note || '', images: n.images || [],
+      batches: n.batches || [],
       collapsed: !!n.collapsed,
       bodyCollapsed: !!n.bodyCollapsed,
       color: n.color || null, rules: n.rules || []
@@ -5227,7 +5612,7 @@ document.getElementById('btnRoot').onclick = () => {
     x: 80 + (count % 3) * 380,
     y: 80 + Math.floor(count / 3) * 260,
     baseId: 'AB',
-    note: '', images: [],
+    note: '', images: [], batches: [],
     collapsed: false, bodyCollapsed: false,
     color: levelColorOf(0)
   };
@@ -5346,6 +5731,7 @@ async function init() {
       if (data.nodes?.length) {
         state.nodes = data.nodes.map(n => ({
           ...n, note: n.note || '', images: n.images || [],
+          batches: n.batches || [],
           collapsed: !!n.collapsed,
           bodyCollapsed: !!n.bodyCollapsed,
           color: n.color || null, rules: n.rules || []
@@ -5367,21 +5753,21 @@ async function init() {
     const root = {
       id: uid('n'), kind: 'root', title: '产品族',
       x: 120, y: 200, baseId: 'AB',
-      note: '', images: [],
+      note: '', images: [], batches: [],
       collapsed: false, bodyCollapsed: false,
       color: levelColorOf(0)
     };
     const c1 = {
       id: uid('n'), kind: 'rule', title: '子产品 A', x: 490, y: 100,
       rules: [{ type: 'seq', value: 1, digits: 2, auto: true }],
-      note: '', images: [],
+      note: '', images: [], batches: [],
       collapsed: false, bodyCollapsed: false,
       color: levelColorOf(1)
     };
     const c2 = {
       id: uid('n'), kind: 'rule', title: '子产品 B', x: 490, y: 360,
       rules: [{ type: 'seq', value: 1, digits: 2, auto: true }],
-      note: '', images: [],
+      note: '', images: [], batches: [],
       collapsed: false, bodyCollapsed: false,
       color: levelColorOf(1)
     };
