@@ -154,6 +154,42 @@ try {
   body.readonly-mode .node .node-title{ pointer-events: auto !important; cursor: default; }
   body.readonly-mode .node .node-head{ cursor: default !important; }
 
+  /* ---------- ★ 锁定节点 ---------- */
+  /* 锁定后：所有编辑入口失效，但折叠/展开与复制编码仍可用 */
+  .node.locked .node-title,
+  .node.locked .base-input,
+  .node.locked .note-input,
+  .node.locked .r-input,
+  .node.locked .rule-type,
+  .node.locked .color-dot,
+  .node.locked .icon-btn:not(.chev):not(.subtree-chev),
+  .node.locked .add-rule,
+  .node.locked .add-img,
+  .node.locked .thumb-del,
+  .node.locked .mini input,
+  .node.locked .port,
+  .node.locked .batch-title{
+    pointer-events: none !important;
+    opacity: .55;
+  }
+  /* 锁定后标题仍可悬停查看完整文字（focus 会被立刻 blur，改不了内容） */
+  .node.locked .node-title{ pointer-events: auto !important; cursor: default; }
+  .node.locked .node-head{ cursor: default; }
+  /* 金色内描边，一眼看出哪些节点被锁住 */
+  .node.locked::after{
+    content:''; position:absolute; inset:0; border-radius:12px;
+    pointer-events:none;
+    box-shadow:inset 0 0 0 2px rgba(255,183,77,.45);
+  }
+  .lock-badge{
+    display:none;
+    font-size:10px; padding:1px 4px; border-radius:9px;
+    margin-left:1px; flex:none; line-height:1.4; white-space:nowrap;
+    background:rgba(255,183,77,.18); color:var(--gold-soft);
+    border:1px solid rgba(255,183,77,.4);
+  }
+  .node.locked .lock-badge{ display:inline-block; }
+
   /* ---------- 画布 ---------- */
   .stage{ flex:1; overflow:auto; position:relative; }
   /* ★ 中键平移画布：拖动期间显示抓手光标并禁止选中文本 */
@@ -486,6 +522,7 @@ try {
   .tbtn.xs{ padding:4px 10px; font-size:12px; border-radius:7px; }
   body.readonly-mode #selDelete,
   body.readonly-mode #selColor,
+  body.readonly-mode #selLock,
   body.readonly-mode #selCollapse,
   body.readonly-mode #selBodyCollapse,
   body.readonly-mode #selExpand,
@@ -1258,6 +1295,7 @@ try {
 <div class="selection-bar" id="selectionBar">
   <span class="sel-count">已选 <b id="selCount">0</b> 项</span>
   <button class="tbtn xs" id="selColor" title="为选中节点批量设置颜色">🎨 改色</button>
+  <button class="tbtn xs" id="selLock" title="锁定/解锁选中的节点">🔒 锁定</button>
   <span class="divider"></span>
   <button class="tbtn xs" id="selBodyCollapse" title="仅收缩选中节点的看板，保留子级可见">▸ 仅收自身</button>
   <button class="tbtn xs" id="selCollapse" title="折叠选中节点及其所有子级">▼ 折叠子树</button>
@@ -1545,7 +1583,7 @@ function takeSnapshot() {
       id: n.id, kind: n.kind, title: n.title,
       x: n.x, y: n.y,
       baseId: n.baseId, rules: n.rules,
-      generic: !!n.generic, fixedId: n.fixedId || '',
+      generic: !!n.generic, fixedId: n.fixedId || '', locked: !!n.locked,
       note: n.note, images: n.images,
       batches: n.batches || [],
       collapsed: n.collapsed,
@@ -1607,7 +1645,7 @@ function applySnapshot(str) {
       note: n.note || '',
       images: n.images || [],
       batches: n.batches || [],
-      generic: !!n.generic, fixedId: n.fixedId || '',
+      generic: !!n.generic, fixedId: n.fixedId || '', locked: !!n.locked,
       collapsed: !!n.collapsed,
       bodyCollapsed: !!n.bodyCollapsed,
       color: n.color || null,
@@ -1686,6 +1724,28 @@ function guardReadOnly() {
   if (readOnlyMode) { toast('只读模式，无法修改数据'); return true; }
   return false;
 }
+/** ★ 锁定节点守卫：锁定后禁止拖动 / 编辑 / 连线，但允许查看与复制编码 */
+function guardLocked(node, action) {
+  if (node && node.locked) {
+    toast(`节点「${node.title || '未命名'}」已锁定，请先解锁${action ? '（' + action + '）' : ''}`);
+    return true;
+  }
+  return false;
+}
+/** ★ 批量锁定 / 解锁：已全锁则解锁，否则全部锁定 */
+function toggleLockMany(nodes) {
+  if (guardReadOnly()) return;
+  const list = (nodes || []).filter(Boolean);
+  if (!list.length) return;
+  pushUndo();
+  const allLocked = list.every(n => n.locked);
+  list.forEach(n => { n.locked = !allLocked; });
+  render(); markDirty(); updateSelectionBar();
+  const what = list.length === 1 ? `「${list[0].title || '未命名'}」` : `${list.length} 个节点`;
+  toast(allLocked
+    ? `已解锁${what}`
+    : `已锁定${what}：拖动 / 编辑 / 连线均已禁用`);
+}
 
 /* =========================================================================
  *  层级配色
@@ -1702,7 +1762,7 @@ function applyLevelColorsToAll(silent) {
   pushUndo();
   const depthMap = computeNodeDepth();
   // ★ 通用节点保留自己的紫色标识，不参与层级配色
-  state.nodes.forEach(n => { if (!n.generic) n.color = levelColorOf(depthMap.get(n.id) ?? 0); });
+  state.nodes.forEach(n => { if (!n.generic && !n.locked) n.color = levelColorOf(depthMap.get(n.id) ?? 0); });
   render(); markDirty();
   if (!silent) toast('已按层级自动配色 · 同级同色');
 }
@@ -2116,10 +2176,7 @@ function drawEdges() {
     hit.addEventListener('click', ev => {
       ev.stopPropagation();
       if (guardReadOnly()) return;
-      pushUndo();
-      state.edges = state.edges.filter(x => x.id !== e.id);
-      drawEdges(); refreshIds(); markDirty();
-      toast('已断开连接');
+      removeEdge(e.id);   // ★ 走统一入口：锁定节点会被拦下
     });
 
     const path = document.createElementNS(NS, 'path');
@@ -2261,7 +2318,7 @@ function refreshIds() {
     // ★ 同步左上角的订货号角标
     const flag = nodeEl.querySelector('.node-code-flag');
     if (flag) {
-      flag.textContent = (n.generic ? '🧩 ' : '') + (v === null ? '未连接' : (v || '（空）'));
+      flag.textContent = (n.locked ? '🔒 ' : '') + (n.generic ? '🧩 ' : '') + (v === null ? '未连接' : (v || '（空）'));
       flag.title = n.generic
         ? (v ? `通用节点 · 自定义订货号：${v}（点击复制）` : '通用节点 · 尚未填写自定义订货号')
         : (v === null ? '该节点尚未连接到起始节点' : `订货号：${v}（点击复制）`);
@@ -2304,6 +2361,7 @@ function positionColorPop(pop, anchorBtn) {
 }
 function openColorPop(node, anchorBtn) {
   if (guardReadOnly()) return;
+  if (guardLocked(node, '改色')) return;
   closeColorPop();
   const pop = el('div', 'color-pop');
   PRESET_COLORS.forEach(c => {
@@ -2343,6 +2401,7 @@ function openColorPop(node, anchorBtn) {
 }
 function openColorPopMulti(nodesArr, anchorBtn) {
   if (guardReadOnly()) return;
+  if (nodesArr.some(n => n.locked)) { toast('选中项含锁定节点，请先解锁'); return; }
   closeColorPop();
   const pop = el('div', 'color-pop');
   PRESET_COLORS.forEach(c => {
@@ -2719,7 +2778,8 @@ function buildNodeEl(node) {
   const wrap = el('div', 'node'
     + (node.kind === 'root' ? ' root' : '')
     + (node.collapsed ? ' collapsed' : '')
-    + (node.bodyCollapsed ? ' body-collapsed' : ''));
+    + (node.bodyCollapsed ? ' body-collapsed' : '')
+    + (node.locked ? ' locked' : ''));
   wrap.dataset.id = node.id;
   wrap.style.left = node.x + 'px';
   wrap.style.top  = node.y + 'px';
@@ -2762,12 +2822,13 @@ function buildNodeEl(node) {
   // ★ 标题过长时：悬停显示全文（只在被截断时才弹）
   title.addEventListener('mouseenter', () => showTitleTooltip(title));
   title.addEventListener('mouseleave', hideTitleTooltip);
-  title.addEventListener('focus', () => { hideTitleTooltip(); if (readOnlyMode) title.blur(); });
+  title.addEventListener('focus', () => { hideTitleTooltip(); if (readOnlyMode || node.locked) title.blur(); });
 
   const imgBadge = el('span', 'img-count-badge' + (hasImages ? ' has-content' : ''), hasImages ? `📷${node.images.length}` : '');
   const subBadge = el('span', 'subtree-badge' + (childCount > 0 ? ' has-content' : ''), childCount > 0 ? `+${childCount}` : '');
   const batchCount = batchesOf(node).length;
   const batchBadge = el('span', 'batch-badge' + (batchCount ? ' has-content' : ''), batchCount ? `🏷${batchCount}` : '');
+  const lockBadge = el('span', 'lock-badge', '🔒');
 
   const colorBtn = el('button', 'color-dot');
   colorBtn.title = '更改节点颜色';
@@ -2782,7 +2843,7 @@ function buildNodeEl(node) {
   delBtn.title = '删除节点（含其所有子节点）';
   delBtn.onclick = ev => { ev.stopPropagation(); if (guardReadOnly()) return; removeNode(node.id); };
 
-  head.append(chev, subtreeChev, title, imgBadge, subBadge, batchBadge, colorBtn, addBtn, delBtn);
+  head.append(chev, subtreeChev, title, imgBadge, subBadge, batchBadge, lockBadge, colorBtn, addBtn, delBtn);
   wrap.appendChild(head);
 
   const body = el('div', 'node-body');
@@ -3049,13 +3110,30 @@ function updateSelectionBar() {
   const cnt = document.getElementById('selCount');
   if (selectedIds.size > 0) { bar.classList.add('show'); cnt.textContent = selectedIds.size; }
   else bar.classList.remove('show');
+  // ★ 批量锁定按钮：选中的都锁了 → 显示「解锁」
+  const lockBtn = document.getElementById('selLock');
+  if (lockBtn) {
+    const sel = getSelectedNodes();
+    const allLocked = sel.length > 0 && sel.every(n => n.locked);
+    lockBtn.textContent = allLocked ? '🔓 解锁' : '🔒 锁定';
+    lockBtn.title = allLocked
+      ? `解锁选中的 ${sel.length} 个节点`
+      : `锁定选中的 ${sel.length} 个节点（禁止拖动 / 编辑 / 连线）`;
+  }
 }
 
+document.getElementById('selLock').onclick = () => {
+  if (guardReadOnly()) return;
+  const selected = getSelectedNodes();
+  if (!selected.length) return;
+  toggleLockMany(selected);
+};
 document.getElementById('selClear').onclick = clearSelection;
 document.getElementById('selDelete').onclick = () => {
   if (guardReadOnly()) return;
   const selected = getSelectedNodes();
   if (!selected.length) return;
+  if (selected.some(n => n.locked)) { toast('选中项含锁定节点，请先解锁'); return; }
   if (!confirm(`确定删除选中的 ${selected.length} 个节点及其所有子节点？`)) return;
   pushUndo();
   const doomed = new Set();
@@ -3146,7 +3224,7 @@ function copySelectedNodes() {
       rules: n.rules ? JSON.parse(JSON.stringify(n.rules)) : undefined,
       note: n.note || '',
       images: n.images ? [...n.images] : [],
-      generic: !!n.generic, fixedId: n.fixedId || '',
+      generic: !!n.generic, fixedId: n.fixedId || '', locked: !!n.locked,
       batches: n.batches ? JSON.parse(JSON.stringify(n.batches)) : [],
       collapsed: !!n.collapsed,
       bodyCollapsed: !!n.bodyCollapsed,
@@ -3188,7 +3266,7 @@ function pasteNodes() {
       rules: item.rules ? JSON.parse(JSON.stringify(item.rules)) : undefined,
       note: item.note || '',
       images: item.images ? [...item.images] : [],
-      generic: !!item.generic, fixedId: item.fixedId || '',
+      generic: !!item.generic, fixedId: item.fixedId || '', locked: !!item.locked,
       // 批号随节点复制，但 id 必须重新生成，避免两份数据撞 id
       batches: (item.batches || []).map(b => ({ ...b, id: uid('b') })),
       collapsed: !!item.collapsed,
@@ -3497,6 +3575,7 @@ stage.addEventListener('mouseleave', () => { if (altKeyDown) hideAltPreview(); }
  * ========================================================================= */
 function addChild(parent) {
   if (guardReadOnly()) return;
+  if (guardLocked(parent, '添加子节点')) return;
   pushUndo();
   const pDepth = computeNodeDepth().get(parent.id) ?? 0;
   const newDepth = pDepth + 1;
@@ -3526,6 +3605,7 @@ function removeNode(id) {
   if (guardReadOnly()) return;
   const node = getNode(id);
   if (!node) return;
+  if (guardLocked(node, '删除')) return;
   const doomed = new Set([id]);
   let changed = true;
   while (changed) {
@@ -3548,6 +3628,8 @@ function connect(fromId, toId) {
   const toNode = getNode(toId);
   if (!toNode) return;
   if (toNode.kind === 'root') return toast('起始节点不能作为子节点');
+  if (guardLocked(toNode, '新建连线')) return;
+  if (guardLocked(getNode(fromId), '新建连线')) return;
   // 环检测：从 from 出发沿「所有」父链向上（多父时也必须判定正确）
   const seen = new Set();
   const stack = [getNode(fromId)];
@@ -3615,11 +3697,19 @@ function startDrag(e, nodeEl) {
   e.preventDefault();
   const node = getNode(nodeEl.dataset.id);
   if (!node) return;
+  if (guardLocked(node, '拖动')) return;
 
   const isBatch = selectedIds.has(node.id) && selectedIds.size > 1;
-  const movingNodes = isBatch
+  let movingNodes = isBatch
     ? state.nodes.filter(n => selectedIds.has(n.id) && visibleSet.has(n.id))
     : [node];
+  // ★ 锁定节点不参与拖动
+  const lockedCount = movingNodes.filter(n => n.locked).length;
+  if (lockedCount) {
+    movingNodes = movingNodes.filter(n => !n.locked);
+    if (!movingNodes.length) return;
+    toast(`已跳过 ${lockedCount} 个锁定节点`);
+  }
   const movingSet = new Set(movingNodes.map(n => n.id));
 
   const initialPositions = movingNodes.map(n => ({ node: n, ox: n.x, oy: n.y }));
@@ -3808,6 +3898,11 @@ function startLink(e, fromId) {
   document.addEventListener('pointerup', up);
 }
 function removeEdge(edgeId) {
+  const edge = state.edges.find(x => x.id === edgeId);
+  if (!edge) return;
+  // ★ 连线任一端被锁定 → 不允许断开
+  if (guardLocked(getNode(edge.from), '断开连线')) return;
+  if (guardLocked(getNode(edge.to), '断开连线')) return;
   pushUndo();
   state.edges = state.edges.filter(x => x.id !== edgeId);
   scheduleDraw(); refreshIds(); markDirty();
@@ -3941,6 +4036,11 @@ function showNodeCtxMenu(nodeId, x, y) {
         '', () => toggleGeneric(node), { disabled: readOnlyMode }));
       menu.appendChild(makeCtxSep());
     }
+    // ★ 锁定 / 解锁：单节点与「框选批量」共用同一入口
+    const allSelLocked = selected.length > 0 && selected.every(n => n.locked);
+    menu.appendChild(makeCtxItem(
+      (allSelLocked ? '🔓 解锁' : '🔒 锁定') + (multi ? ` (${selected.length})` : '节点'),
+      '', () => toggleLockMany(selected), { disabled: readOnlyMode }));
     menu.appendChild(makeCtxItem('📋 复制', 'Ctrl+C', () => {
       if (copySelectedNodes()) toast(`已复制 ${clipboard.nodes.length} 个节点`);
     }, { disabled: readOnlyMode }));
@@ -3991,6 +4091,7 @@ function showNodeCtxMenu(nodeId, x, y) {
     menu.appendChild(makeCtxSep());
     menu.appendChild(makeCtxItem(`🗑 删除${multi ? ` (${selected.length})` : ''}`, 'Del', () => {
       if (guardReadOnly()) return;
+      if (selected.some(n => n.locked)) { toast('选中项含锁定节点，请先解锁'); return; }
       const count = selected.length;
       if (!confirm(`确定删除选中的 ${count} 个节点及其所有子节点？`)) return;
       pushUndo();
@@ -4218,12 +4319,18 @@ function autoLayout(mode = 'vertical', opts = {}) {
   if (undoable) pushUndo();
   visibleSet = computeVisible();
   measureNodeHeights();
+  // ★ 锁定节点不参与排版，保持原位
+  const lockedPos = state.nodes.filter(n => n.locked).map(n => ({ n, x: n.x, y: n.y }));
   if (mode === 'tree') layoutTree(); else layoutVertical();
+  lockedPos.forEach(p => { p.n.x = p.x; p.n.y = p.y; });
   fitCanvasSize();
   render(); markDirty();
   if (forceFreeMove) setFreeMove(true, true);
   if (scrollToStart) stage.scrollTo({ left: 0, top: 0, behavior: 'smooth' });
-  if (toastMsg) toast(mode === 'tree' ? '已按「横向树形」排列' : '已按「往右竖向」排列');
+  if (toastMsg) {
+    toast((mode === 'tree' ? '已按「横向树形」排列' : '已按「往右竖向」排列')
+      + (lockedPos.length ? `（已跳过 ${lockedPos.length} 个锁定节点）` : ''));
+  }
 }
 
 let layoutMenuEl = null, layoutMenuOutside = null;
@@ -4282,6 +4389,7 @@ document.addEventListener('paste', async e => {
   if (!activeNodeId) return;
   const node = getNode(activeNodeId);
   if (!node) return;
+  if (guardLocked(node, '粘贴截图')) return;
   const items = [...(e.clipboardData?.items || [])];
   const imgs = items.filter(i => i.type.startsWith('image/'));
   if (!imgs.length) return;
@@ -5139,7 +5247,7 @@ function stripImagesForShare() {
       id: n.id, kind: n.kind, title: n.title,
       x: n.x, y: n.y,
       baseId: n.baseId, rules: n.rules,
-      generic: !!n.generic, fixedId: n.fixedId || '',
+      generic: !!n.generic, fixedId: n.fixedId || '', locked: !!n.locked,
       note: n.note, images: [],
       batches: n.batches || [],
       collapsed: n.collapsed,
@@ -6066,7 +6174,8 @@ function downloadJson() {
 document.getElementById('btnClear').onclick = () => {
   if (guardReadOnly()) return;
   if (!state.nodes.length) return;
-  if (!confirm('确定清空所有节点？此操作不可撤销。')) return;
+  const lockedN = state.nodes.filter(n => n.locked).length;
+  if (!confirm(`确定清空所有节点？${lockedN ? `（其中 ${lockedN} 个已锁定，也会一起删除）` : ''}此操作不可撤销。`)) return;
   pushUndo();
   state.nodes = []; state.edges = []; selectedIds.clear();
   render(); markDirty(); updateSelectionBar();
@@ -6137,6 +6246,7 @@ document.getElementById('btnGeneric').onclick = () => {
 /** 普通节点 ⇄ 通用节点 */
 function toggleGeneric(node) {
   if (guardReadOnly()) return;
+  if (guardLocked(node, '切换类型')) return;
   pushUndo();
   if (!node.generic) {
     const oldCode = computeId(node);   // 先按普通节点算出当前编码，再切换类型
