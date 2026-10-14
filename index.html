@@ -2019,9 +2019,10 @@ function segmentOf(node) {
 }
 function computeId(node, depth = 0) {
   if (depth > 80) return null;
+  // 起始节点优先：即使数据里误带了通用标记，也按起始节点算
+  if (node.kind === 'root') return node.baseId || '';
   // ★ 通用节点：订货号由用户自定义，不参与父级拼接、不受父级规则影响
   if (node.generic) return node.fixedId || '';
-  if (node.kind === 'root') return node.baseId || '';
   const p = parentOf(node.id);
   if (!p) return null;
   const base = computeId(p, depth + 1);
@@ -2902,8 +2903,8 @@ function buildNodeEl(node) {
     body.appendChild(field);
   }
 
-  // ★ 通用节点：订货号自己填，不拼父级、不受父级规则影响
-  if (node.generic) {
+  // ★ 通用节点：订货号自己填，不拼父级、不受父级规则影响（起始节点除外）
+  if (node.generic && node.kind !== 'root') {
     const field = el('label', 'field');
     field.appendChild(el('span', null, '🧩 自定义订货号（不随父级变化）'));
     const fixed = el('input', 'base-input');
@@ -6286,7 +6287,17 @@ document.getElementById('btnGeneric').onclick = () => {
 /** 普通节点 ⇄ 通用节点 */
 function toggleGeneric(node) {
   if (guardReadOnly()) return;
+  if (!node) return;
+  // ★ 起始节点不参与「通用 ⇄ 普通」互转
+  if (node.kind === 'root') { toast('起始节点不能转换为通用节点'); return; }
   if (guardLocked(node, '切换类型')) return;
+
+  // 转回普通节点时：普通节点只能有一个父，多余的连接需要断开
+  const extraIns = node.generic ? state.edges.filter(e => e.to === node.id).slice(1) : [];
+  if (extraIns.length) {
+    if (!confirm(`该通用节点有 ${extraIns.length + 1} 个父节点。转为普通节点后只能保留一个父，其余 ${extraIns.length} 条连接会被断开。继续？`)) return;
+  }
+
   pushUndo();
   if (!node.generic) {
     const oldCode = computeId(node);   // 先按普通节点算出当前编码，再切换类型
@@ -6298,11 +6309,16 @@ function toggleGeneric(node) {
     if (!Array.isArray(node.rules) || !node.rules.length) {
       node.rules = [{ type: 'seq', value: 1, digits: 2, auto: true }];
     }
+    if (extraIns.length) {
+      const drop = new Set(extraIns.map(e => e.id));
+      state.edges = state.edges.filter(e => !drop.has(e.id));
+    }
   }
   render(); markDirty();
   toast(node.generic
     ? '已转为通用节点：订货号改为自定义，不再随父级拼接'
-    : '已转为普通节点：订货号恢复为「父级 + 扩展字段」拼接');
+    : '已转为普通节点：订货号恢复为「父级 + 扩展字段」拼接'
+      + (extraIns.length ? `（已断开 ${extraIns.length} 条多余父连接）` : ''));
 }
 
 /* =========================================================================
