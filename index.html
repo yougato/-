@@ -252,6 +252,11 @@ try {
   .node.selected{ outline: 3px solid var(--accent); outline-offset: 3px; }
   .node.search-dim{ opacity:.2; }
   .node.search-hit{ box-shadow:0 0 0 3px rgba(255,183,77,.4),0 8px 24px rgba(0,0,0,.5); }
+
+  /* ★ 聚焦：点击节点高亮它的祖先链 + 整棵子树（用金色，与"选中"的蓝色描边区分） */
+  .node.focus-dim{ opacity:.22; }
+  .node.focus-hit{ box-shadow:0 0 0 2px var(--gold), 0 0 0 7px rgba(255,183,77,.16), 0 8px 24px rgba(0,0,0,.5); }
+  #edges .edge.dim{ opacity:.1; }
   .node.flash{ animation:flash 1.15s ease; }
   .node.alt-hover{ box-shadow:0 0 0 2px rgba(76,141,255,.5), 0 8px 24px rgba(0,0,0,.5); }
   @keyframes flash{
@@ -2206,7 +2211,9 @@ function drawEdges() {
 
     const path = document.createElementNS(NS, 'path');
     path.setAttribute('d', d);
-    path.setAttribute('class', 'edge');
+    // ★ 聚焦时：与聚焦集合无关的连线一起变暗
+    const dimmed = focusSet && !(focusSet.has(e.from) && focusSet.has(e.to));
+    path.setAttribute('class', dimmed ? 'edge dim' : 'edge');
 
     svg.append(hit, path);
   }
@@ -3089,6 +3096,7 @@ function render() {
   applySearchHighlight();
   updateSearchCount();
   applySelectionVisual();
+  applyFocusVisual();
   if (dashboardOpen) renderDashboardTable();
 }
 
@@ -3135,6 +3143,71 @@ function toggleSelectNode(nodeEl) {
   }
   updateSelectionBar();
 }
+/* =========================================================================
+ *  ★ 聚焦：点击节点，高亮与它相关的所有节点（祖先链 + 整棵子树）
+ * ========================================================================= */
+let focusNodeId = null;
+let focusSet = null;
+
+/** 相关节点 = 自身 + 全部祖先（含多父）+ 全部后代 */
+function computeFocusSet(id) {
+  const set = new Set();
+  const start = getNode(id);
+  if (!start) return set;
+  // 向下：整棵子树
+  const down = [start], seenDown = new Set();
+  while (down.length) {
+    const cur = down.pop();
+    if (!cur || seenDown.has(cur.id)) continue;
+    seenDown.add(cur.id);
+    set.add(cur.id);
+    for (const e of state.edges) if (e.from === cur.id) down.push(getNode(e.to));
+  }
+  // 向上：所有祖先
+  const up = [start], seenUp = new Set();
+  while (up.length) {
+    const cur = up.pop();
+    if (!cur || seenUp.has(cur.id)) continue;
+    seenUp.add(cur.id);
+    set.add(cur.id);
+    for (const e of state.edges) if (e.to === cur.id) up.push(getNode(e.from));
+  }
+  return set;
+}
+function applyFocusVisual() {
+  const nodes = canvas.querySelectorAll('.node');
+  if (!focusSet) {
+    nodes.forEach(n => n.classList.remove('focus-hit', 'focus-dim'));
+    return;
+  }
+  nodes.forEach(n => {
+    const hit = focusSet.has(n.dataset.id);
+    n.classList.toggle('focus-hit', hit);
+    n.classList.toggle('focus-dim', !hit);
+  });
+}
+/** 聚焦某节点；再点同一个节点 = 取消聚焦 */
+function focusNode(id, silent) {
+  if (focusNodeId === id) { clearFocus(); return; }
+  const n = getNode(id);
+  if (!n) return;
+  focusNodeId = id;
+  focusSet = computeFocusSet(id);
+  applyFocusVisual();
+  scheduleDraw();
+  if (!silent) {
+    toast(`已聚焦「${n.title || '未命名'}」：相关 ${focusSet.size} 个节点（点空白处或 Esc 退出）`);
+  }
+}
+function clearFocus(silent) {
+  if (!focusNodeId) return;
+  focusNodeId = null;
+  focusSet = null;
+  applyFocusVisual();
+  scheduleDraw();
+  if (!silent) toast('已退出聚焦');
+}
+
 function applySelectionVisual() {
   canvas.querySelectorAll('.node').forEach(nel => {
     nel.classList.toggle('selected', selectedIds.has(nel.dataset.id));
@@ -3715,9 +3788,9 @@ canvas.addEventListener('pointerdown', e => {
   if (readOnlyMode) {
     if (e.target.closest('.chev') || e.target.closest('.subtree-chev')) return;
     if (e.target.closest('input, select, button, textarea, label')) return;
-    if (!nodeEl) { startBoxSelect(e); return; }
+    if (!nodeEl) { clearFocus(); startBoxSelect(e); return; }
     if (nodeEl && (e.ctrlKey || e.metaKey)) { e.preventDefault(); toggleSelectNode(nodeEl); return; }
-    if (nodeEl) { toggleSelectNode(nodeEl); return; }
+    if (nodeEl) { toggleSelectNode(nodeEl); focusNode(nodeEl.dataset.id); return; }
     return;
   }
 
@@ -3735,6 +3808,7 @@ canvas.addEventListener('pointerdown', e => {
     startDrag(e, nodeEl);
     return;
   }
+  clearFocus();          // ★ 点画布空白处退出聚焦
   startBoxSelect(e);
 });
 
@@ -3907,6 +3981,14 @@ function startDrag(e, nodeEl) {
       markDirty();
     } else {
       abortTransaction();    // ★ 未移动，放弃事务
+      // ★ 单击（没拖动）：先选中该节点，再聚焦它的血缘链
+      if (!selectedIds.has(node.id)) {
+        selectedIds.clear();
+        selectedIds.add(node.id);
+        applySelectionVisual();
+        updateSelectionBar();
+      }
+      focusNode(node.id);
     }
   };
   document.addEventListener('pointermove', move);
@@ -4080,6 +4162,8 @@ function showNodeCtxMenu(nodeId, x, y) {
       menu.appendChild(makeCtxItem('➕ 添加子节点', '', () => addChild(node)));
       menu.appendChild(makeCtxItem(node.generic ? '↩ 转为普通节点' : '🧩 转为通用节点',
         '', () => toggleGeneric(node), { disabled: readOnlyMode }));
+      menu.appendChild(makeCtxItem(focusNodeId === nodeId ? '🎯 取消聚焦' : '🎯 聚焦相关节点',
+        '', () => focusNode(nodeId)));
       menu.appendChild(makeCtxSep());
     }
     // ★ 锁定 / 解锁：单节点与「框选批量」共用同一入口
@@ -4253,14 +4337,21 @@ document.addEventListener('keydown', e => {
     e.preventDefault(); document.getElementById('zoomFit').click();
     return;
   }
-  // Esc 取消选择
+  // Esc 取消聚焦 / 取消选择
   if (e.key === 'Escape' && !editing) {
+    if (focusNodeId) { e.preventDefault(); clearFocus(); return; }
     if (selectedIds.size > 0) { e.preventDefault(); clearSelection(); }
   }
   // Delete 删除
   if (e.key === 'Delete' && !editing && selectedIds.size > 0) {
     e.preventDefault();
     document.getElementById('selDelete').click();
+  }
+  // F 聚焦选中的单个节点（再按一次取消）
+  if ((e.key === 'f' || e.key === 'F') && !editing && !cmd && selectedIds.size === 1) {
+    e.preventDefault();
+    focusNode([...selectedIds][0]);
+    return;
   }
   // F2 重命名选中的单个节点
   if (e.key === 'F2' && !editing && selectedIds.size === 1) {
