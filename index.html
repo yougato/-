@@ -92,6 +92,7 @@
   .save-status{
     font-size:12px; padding:4px 10px; border-radius:6px; white-space:nowrap;
     font-family:ui-monospace,monospace;
+    max-width:230px; overflow:hidden; text-overflow:ellipsis;
   }
   .save-status.ok{ color:var(--ok); background:rgba(60,180,110,.12); }
   .save-status.dirty{ color:var(--gold); background:rgba(255,183,77,.12); }
@@ -872,6 +873,22 @@
     width: 18px; border-radius: 4px;
   }
 
+  /* ★ 恢复上次打开的文件 */
+  .restore-bar{
+    position:fixed; top:64px; left:50%; transform:translateX(-50%);
+    z-index:520; display:none; align-items:center; gap:10px;
+    background:#1c2330; border:1px solid var(--accent); border-radius:12px;
+    padding:7px 12px 7px 14px; font-size:13px;
+    box-shadow:0 14px 40px rgba(0,0,0,.6), 0 0 0 3px rgba(76,141,255,.18);
+    max-width:92vw;
+  }
+  .restore-bar.show{ display:flex; }
+  .restore-bar .rb-icon{ flex:none; color:#9dc2ff; }
+  .restore-bar .rb-file{
+    font-family:ui-monospace,monospace; color:var(--gold);
+    max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+
   /* Toast */
   .toast{
     position:fixed; left:50%; bottom:32px; transform:translateX(-50%) translateY(20px);
@@ -1107,6 +1124,14 @@
       <button class="tbtn success" id="onboardNext">下一步</button>
     </div>
   </div>
+</div>
+
+<!-- ★ 恢复上次打开的文件 -->
+<div class="restore-bar" id="restoreBar">
+  <span class="rb-icon">↻</span>
+  <span>上次编辑的文件：<span class="rb-file" id="restoreFileName"></span></span>
+  <button class="tbtn xs success" id="restoreBtn">恢复</button>
+  <button class="tbtn xs" id="restoreDismiss">忽略</button>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -4929,11 +4954,56 @@ importRunBtn.onclick = () => {
  *  文件保存 / 读取
  * ========================================================================= */
 const supportsFS = 'showSaveFilePicker' in window;
+const FS_PICKER_ID = 'order-nodes-json';   // 同一个 id → 浏览器记住该选择器上次用过的目录
+const FS_HANDLE_KEY = 'last-file-handle';  // IndexedDB 中存放文件句柄的键
 let fileHandle = null;
 let fileDirty = false;
 let lastSavedTime = '';
 let autoSaveTimer = null;
+let pendingRestoreHandle = null;           // 权限待授予的「上次文件」句柄
 const saveStatusEl = document.getElementById('saveStatus');
+
+/* ---------- IndexedDB：持久化文件句柄（跨会话记住上次打开的文件） ---------- */
+function idbOpen() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('order-node-fs', 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains('handles')) db.createObjectStore('handles');
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+function idbWrite(key, value) {   // value === undefined 表示删除
+  return idbOpen().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction('handles', 'readwrite');
+    const store = tx.objectStore('handles');
+    if (value === undefined) store.delete(key); else store.put(value, key);
+    tx.oncomplete = () => { db.close(); resolve(); };
+    tx.onerror = () => { db.close(); reject(tx.error); };
+  }));
+}
+function idbRead(key) {
+  return idbOpen().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction('handles', 'readonly');
+    const rq = tx.objectStore('handles').get(key);
+    rq.onsuccess = () => { db.close(); resolve(rq.result); };
+    rq.onerror = () => { db.close(); reject(rq.error); };
+  }));
+}
+async function rememberFileHandle(h) {
+  if (!supportsFS || !h) return;
+  try { await idbWrite(FS_HANDLE_KEY, h); } catch (e) {}
+}
+async function forgetFileHandle() {
+  if (!supportsFS) return;
+  try { await idbWrite(FS_HANDLE_KEY, undefined); } catch (e) {}
+}
+async function recallFileHandle() {
+  if (!supportsFS) return null;
+  try { return (await idbRead(FS_HANDLE_KEY)) || null; } catch (e) { return null; }
+}
 
 function serialize() {
   return takeSnapshot();
@@ -4949,11 +5019,12 @@ function updateSaveStatus() {
     saveStatusEl.className = 'save-status warn';
     return;
   }
+  const fname = fileHandle.name || '文件';
   if (fileDirty) {
-    saveStatusEl.textContent = '● 有改动…';
+    saveStatusEl.textContent = '● ' + fname + ' 有改动…';
     saveStatusEl.className = 'save-status dirty';
   } else {
-    saveStatusEl.textContent = '✓ 已自动保存 ' + lastSavedTime;
+    saveStatusEl.textContent = '✓ ' + fname + ' · ' + lastSavedTime;
     saveStatusEl.className = 'save-status ok';
   }
 }
@@ -4986,12 +5057,18 @@ document.getElementById('btnSaveFile').onclick = async () => {
   if (guardReadOnly()) return;
   if (!supportsFS) { toast('浏览器不支持选择目录，已改为下载文件'); downloadJson(); return; }
   try {
-    fileHandle = await window.showSaveFilePicker({
-      suggestedName: 'order-nodes.json',
+    const opts = {
+      id: FS_PICKER_ID,
+      suggestedName: fileHandle?.name || 'order-nodes.json',
       types: [{ description: '节点订货号数据', accept: { 'application/json': ['.json'] } }]
-    });
+    };
+    const startIn = fileHandle || pendingRestoreHandle;
+    if (startIn) opts.startIn = startIn;   // 默认定位到上次保存/打开的文件
+    fileHandle = await window.showSaveFilePicker(opts);
     await writeFile();
-    toast('已选定保存位置，之后修改将自动保存');
+    await rememberFileHandle(fileHandle);
+    hideRestorePrompt();
+    toast('已选定保存位置：' + fileHandle.name);
   } catch (e) { if (e.name !== 'AbortError') toast('未选择保存位置'); }
 };
 document.getElementById('btnSaveNow').onclick = () => {
@@ -5003,16 +5080,18 @@ document.getElementById('btnOpenFile').onclick = async () => {
   if (guardReadOnly()) return;
   if (supportsFS) {
     try {
-      const [h] = await window.showOpenFilePicker({
+      const opts = {
+        id: FS_PICKER_ID,
+        multiple: false,
         types: [{ description: '节点订货号数据', accept: { 'application/json': ['.json'] } }]
-      });
-      const f = await h.getFile();
-      loadFromText(await f.text());
-      fileHandle = h;
-      fileDirty = false;
-      lastSavedTime = new Date().toTimeString().slice(0, 8);
-      updateSaveStatus();
-      toast('已打开文件');
+      };
+      const startIn = fileHandle || pendingRestoreHandle;
+      if (startIn) opts.startIn = startIn;   // 默认定位到上次打开/保存的文件
+      const [h] = await window.showOpenFilePicker(opts);
+      if (await loadHandleInto(h, { silent: true })) {
+        hideRestorePrompt();
+        toast('已打开文件：' + (h.name || ''));
+      }
     } catch (e) { if (e.name !== 'AbortError') toast('打开失败'); }
     return;
   }
@@ -5021,9 +5100,11 @@ document.getElementById('btnOpenFile').onclick = async () => {
   inp.onchange = async () => { const f = inp.files[0]; if (f) loadFromText(await f.text()); };
   inp.click();
 };
-function loadFromText(text) {
+function loadFromText(text, opts = {}) {
+  if (readOnlyMode) return false;
   try {
     const data = JSON.parse(text);
+    if (!data || typeof data !== 'object') throw new Error('数据格式错误');
     state.nodes = (data.nodes || []).map(n => ({
       ...n, note: n.note || '', images: n.images || [],
       collapsed: !!n.collapsed,
@@ -5042,8 +5123,84 @@ function loadFromText(text) {
     updateUndoRedoBtns();
     render();
     if (data.zoom && data.zoom !== 1) applyZoom(data.zoom);
-    toast('读取成功');
-  } catch (e) { toast('文件格式错误'); }
+    if (!opts.silent) toast('读取成功');
+    return true;
+  } catch (e) {
+    toast(opts.silent ? '上次的文件无法读取，已保留当前数据' : '文件格式错误');
+    return false;
+  }
+}
+
+/* ---------- 打开 / 恢复文件句柄 ---------- */
+/**
+ * 把文件句柄载入应用：读取内容 → 记住句柄（之后自动保存会写回该文件）
+ * @returns {Promise<boolean>} 是否成功
+ */
+async function loadHandleInto(h, opts = {}) {
+  const f = await h.getFile();
+  const text = await f.text();
+  if (!loadFromText(text, opts)) return false;
+  fileHandle = h;
+  fileDirty = false;
+  lastSavedTime = new Date().toTimeString().slice(0, 8);
+  updateSaveStatus();
+  await rememberFileHandle(h);
+  return true;
+}
+
+function showRestorePrompt(h) {
+  pendingRestoreHandle = h;
+  const nameEl = document.getElementById('restoreFileName');
+  if (nameEl) nameEl.textContent = h.name || '上次的文件';
+  const bar = document.getElementById('restoreBar');
+  if (bar) bar.classList.add('show');
+}
+function hideRestorePrompt() {
+  const bar = document.getElementById('restoreBar');
+  if (bar) bar.classList.remove('show');
+}
+document.getElementById('restoreDismiss').onclick = () => {
+  hideRestorePrompt();
+  pendingRestoreHandle = null;
+  toast('已忽略，可用「📂 打开文件」重新打开');
+};
+document.getElementById('restoreBtn').onclick = async () => {
+  const h = pendingRestoreHandle;
+  if (!h) { hideRestorePrompt(); return; }
+  try {
+    const perm = await h.requestPermission({ mode: 'readwrite' });
+    if (perm !== 'granted') return toast('未获得文件访问权限');
+    hideRestorePrompt();
+    if (await loadHandleInto(h, { silent: true })) toast('已恢复上次文件：' + (h.name || ''));
+  } catch (e) { toast('恢复失败：' + (e.message || e)); }
+};
+
+/**
+ * 启动时尝试恢复上次打开的文件：
+ *  · 已授权 → 直接静默读回
+ *  · 待授权 → 显示提示条，等用户点「恢复」（浏览器要求授权必须由用户手势触发）
+ */
+async function tryRestoreFileHandle() {
+  if (!supportsFS) return false;
+  const h = await recallFileHandle();
+  if (!h) return false;
+  let perm = 'prompt';
+  try { perm = await h.queryPermission({ mode: 'readwrite' }); } catch (e) { return false; }
+  if (perm === 'granted') {
+    try {
+      if (await loadHandleInto(h, { silent: true })) {
+        toast('已恢复上次文件：' + (h.name || ''));
+        return true;
+      }
+    } catch (e) {
+      toast('上次的文件已无法访问，已保留当前数据');
+    }
+    await forgetFileHandle();
+    return false;
+  }
+  if (perm === 'denied') { await forgetFileHandle(); return false; }
+  showRestorePrompt(h);
+  return false;
 }
 function downloadJson() {
   downloadBlob(new Blob([serialize()], { type: 'application/json' }), 'order-nodes.json');
@@ -5244,6 +5401,9 @@ async function init() {
 
   if (!supportsFS) toast('当前浏览器不支持选择保存位置，将使用下载方式');
   window.addEventListener('resize', () => { drawEdges(); scheduleViewportSync(); });
+
+  // ★ 恢复上次打开的文件（句柄保存在 IndexedDB，跨会话保留）
+  try { await tryRestoreFileHandle(); } catch (e) { console.error(e); }
 
   // 首次访问显示新手引导
   try {
