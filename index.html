@@ -264,7 +264,14 @@ try {
     background:linear-gradient(180deg,#212a3a,#1b2230);
     border-radius:11px 11px 0 0; border-bottom:1px solid var(--border);
     cursor:grab;
+    flex-wrap:wrap;          /* ★ 让徽标换到第二行，不跟标题抢宽度 */
   }
+  /* ★ 徽标行：截图 / 子节点数 / 批号 / 锁定，独立成行且可多行排列 */
+  .node-badges{
+    flex:1 0 100%; display:flex; flex-wrap:wrap; align-items:center;
+    gap:4px; padding-top:4px; min-width:0;
+  }
+  .node-badges.empty{ display:none; }
   .node.collapsed .node-head,
   .node.body-collapsed .node-head{
     border-bottom:none; border-radius:11px;
@@ -276,7 +283,14 @@ try {
   .node-title{
     flex:1; min-width:0; background:transparent; border:none; color:var(--text);
     font-weight:600; font-size:13px; padding:2px 0; outline:none; font-family:inherit;
+    /* ★ 多行标题：自动折行完整显示；最多约 3 行，超出内部滚动（悬停可看全文） */
+    display:block; resize:none; overflow-y:auto; overflow-x:hidden;
+    line-height:1.35; max-height:56px;
+    white-space:pre-wrap; word-break:break-word;
+    scrollbar-width:thin;
   }
+  .node-title::-webkit-scrollbar{ width:4px; }
+  .node-title::-webkit-scrollbar-thumb{ background:var(--border); border-radius:2px; }
   .node-title:focus{ background:#0b0f15; border-radius:5px; padding:2px 5px; }
   .node.root .node-title{ color:#9dc2ff; }
 
@@ -1744,7 +1758,7 @@ function toggleLockMany(nodes) {
   const what = list.length === 1 ? `「${list[0].title || '未命名'}」` : `${list.length} 个节点`;
   toast(allLocked
     ? `已解锁${what}`
-    : `已锁定${what}：拖动 / 编辑 / 连线均已禁用`);
+    : `已锁定${what}：拖动 / 编辑 / 连线已禁用（一键排版仍会重排位置）`);
 }
 
 /* =========================================================================
@@ -2118,7 +2132,17 @@ function findFreeSpot(node, sx, sy) {
   }
   return { x: sx, y: sy };
 }
+/** ★ 标题多行自适应：按内容撑高（高度上限由 CSS 的 max-height 控制） */
+function autoGrowTitle(t) {
+  if (!t) return;
+  t.style.height = 'auto';
+  t.style.height = t.scrollHeight + 'px';
+}
+function fitTitleHeights() {
+  canvas.querySelectorAll('.node-title').forEach(t => autoGrowTitle(t));
+}
 function measureNodeHeights() {
+  fitTitleHeights();   // ★ 先按内容撑高标题，再测量节点尺寸
   for (const n of state.nodes) {
     const e = canvas.querySelector(`.node[data-id="${n.id}"]`);
     if (e) { n._w = e.offsetWidth; n._h = e.offsetHeight; }
@@ -2815,9 +2839,20 @@ function buildNodeEl(node) {
   subtreeChev.title = node.collapsed ? '展开子树（显示所有子级）' : '折叠子树（隐藏自身看板及所有子级）';
   subtreeChev.onclick = ev => { ev.stopPropagation(); toggleSubtreeCollapse(node); };
 
-  const title = el('input', 'node-title');
+  const title = el('textarea', 'node-title');
+  title.rows = 1;
   title.value = node.title;
-  title.oninput = () => { if (readOnlyMode) { title.value = node.title; return; } node.title = title.value; markDirty(); };
+  title.oninput = () => {
+    if (readOnlyMode) { title.value = node.title; return; }
+    node.title = title.value;
+    autoGrowTitle(title);      // ★ 跟随内容撑高
+    measureNodeHeights();
+    markDirty();
+  };
+  // 标题仍是单行语义：Enter 结束编辑，而不是插入换行
+  title.addEventListener('keydown', ev => {
+    if (ev.key === 'Enter') { ev.preventDefault(); title.blur(); }
+  });
   attachUndoToInput(title);
   // ★ 标题过长时：悬停显示全文（只在被截断时才弹）
   title.addEventListener('mouseenter', () => showTitleTooltip(title));
@@ -2829,6 +2864,14 @@ function buildNodeEl(node) {
   const batchCount = batchesOf(node).length;
   const batchBadge = el('span', 'batch-badge' + (batchCount ? ' has-content' : ''), batchCount ? `🏷${batchCount}` : '');
   const lockBadge = el('span', 'lock-badge', '🔒');
+  // ★ 徽标独立成行：把横向空间让给标题
+  const badgesWrap = el('div', 'node-badges');
+  const showCounts = node.collapsed || node.bodyCollapsed;   // 计数类徽标只在折叠时显示
+  if (showCounts && hasImages) badgesWrap.appendChild(imgBadge);
+  if (showCounts && childCount > 0) badgesWrap.appendChild(subBadge);
+  if (showCounts && batchCount > 0) badgesWrap.appendChild(batchBadge);
+  if (node.locked) badgesWrap.appendChild(lockBadge);
+  if (!badgesWrap.childElementCount) badgesWrap.classList.add('empty');
 
   const colorBtn = el('button', 'color-dot');
   colorBtn.title = '更改节点颜色';
@@ -2843,7 +2886,7 @@ function buildNodeEl(node) {
   delBtn.title = '删除节点（含其所有子节点）';
   delBtn.onclick = ev => { ev.stopPropagation(); if (guardReadOnly()) return; removeNode(node.id); };
 
-  head.append(chev, subtreeChev, title, imgBadge, subBadge, batchBadge, lockBadge, colorBtn, addBtn, delBtn);
+  head.append(chev, subtreeChev, title, colorBtn, addBtn, delBtn, badgesWrap);
   wrap.appendChild(head);
 
   const body = el('div', 'node-body');
@@ -3468,8 +3511,10 @@ function positionTitleTooltip(input) {
 function showTitleTooltip(input) {
   if (!titleTooltipEl) return;
   const text = input.value || '';
-  // 只有文字确实被截断时才提示，否则不打扰
-  if (!text || input.scrollWidth <= input.clientWidth + 1) { hideTitleTooltip(); return; }
+  // 文字被截断才提示：多行标题看高度，单行看宽度
+  const clipped = input.scrollHeight > input.clientHeight + 1
+               || input.scrollWidth > input.clientWidth + 1;
+  if (!text || !clipped) { hideTitleTooltip(); return; }
   titleTooltipEl.textContent = text;
   titleTooltipEl.classList.add('show');
   positionTitleTooltip(input);
@@ -4319,18 +4364,13 @@ function autoLayout(mode = 'vertical', opts = {}) {
   if (undoable) pushUndo();
   visibleSet = computeVisible();
   measureNodeHeights();
-  // ★ 锁定节点不参与排版，保持原位
-  const lockedPos = state.nodes.filter(n => n.locked).map(n => ({ n, x: n.x, y: n.y }));
+  // ★ 一键排版会重排包括锁定节点在内的所有节点（否则布局会错乱）
   if (mode === 'tree') layoutTree(); else layoutVertical();
-  lockedPos.forEach(p => { p.n.x = p.x; p.n.y = p.y; });
   fitCanvasSize();
   render(); markDirty();
   if (forceFreeMove) setFreeMove(true, true);
   if (scrollToStart) stage.scrollTo({ left: 0, top: 0, behavior: 'smooth' });
-  if (toastMsg) {
-    toast((mode === 'tree' ? '已按「横向树形」排列' : '已按「往右竖向」排列')
-      + (lockedPos.length ? `（已跳过 ${lockedPos.length} 个锁定节点）` : ''));
-  }
+  if (toastMsg) toast(mode === 'tree' ? '已按「横向树形」排列' : '已按「往右竖向」排列');
 }
 
 let layoutMenuEl = null, layoutMenuOutside = null;
